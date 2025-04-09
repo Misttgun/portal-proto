@@ -1,0 +1,9 @@
+# UE4 generated files
+Binaries/
+Intermediate/
+Saved/
+
+# C++ IDE files for Visual Studio and Rider
+.vs/
+*.sln
+.idea/
