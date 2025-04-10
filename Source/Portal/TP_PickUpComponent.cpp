@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2025 Maurel Sagbo
 
 #include "TP_PickUpComponent.h"
 
@@ -19,7 +19,7 @@ void UTP_PickUpComponent::BeginPlay()
 void UTP_PickUpComponent::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	// Checking if it is a First Person Character overlapping
-	APortalCharacter* Character = Cast<APortalCharacter>(OtherActor);
+	APCharacter* Character = Cast<APCharacter>(OtherActor);
 	if(Character != nullptr)
 	{
 		// Notify that the actor is being picked up

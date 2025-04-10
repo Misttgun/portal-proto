@@ -1,15 +1,15 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2025 Maurel Sagbo
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/SphereComponent.h"
-#include "PortalCharacter.h"
+#include "PCharacter.h"
 #include "TP_PickUpComponent.generated.h"
 
 // Declaration of the delegate that will be called when someone picks this up
 // The character picking this up is the parameter sent with the notification
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPickUp, APortalCharacter*, PickUpCharacter);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPickUp, APCharacter*, PickUpCharacter);
 
 UCLASS(Blueprintable, BlueprintType, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PORTAL_API UTP_PickUpComponent : public USphereComponent

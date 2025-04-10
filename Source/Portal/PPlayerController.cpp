@@ -1,18 +1,16 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2025 Maurel Sagbo
 
 
-#include "PortalPlayerController.h"
+#include "PPlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 
-void APortalPlayerController::BeginPlay()
+void APPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// get the enhanced input subsystem
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		// add the mapping context so we get controls
 		Subsystem->AddMappingContext(InputMappingContext, 0);
 	}
 }

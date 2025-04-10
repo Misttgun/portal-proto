@@ -1,9 +1,8 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2025 Maurel Sagbo
 
 
 #include "TP_WeaponComponent.h"
-#include "PortalCharacter.h"
-#include "PortalProjectile.h"
+#include "PCharacter.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -27,26 +26,6 @@ void UTP_WeaponComponent::Fire()
 	{
 		return;
 	}
-
-	// Try and fire a projectile
-	if (ProjectileClass != nullptr)
-	{
-		UWorld* const World = GetWorld();
-		if (World != nullptr)
-		{
-			APlayerController* PlayerController = Cast<APlayerController>(Character->GetController());
-			const FRotator SpawnRotation = PlayerController->PlayerCameraManager->GetCameraRotation();
-			// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-			const FVector SpawnLocation = GetOwner()->GetActorLocation() + SpawnRotation.RotateVector(MuzzleOffset);
-	
-			//Set Spawn Collision Handling Override
-			FActorSpawnParameters ActorSpawnParams;
-			ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-	
-			// Spawn the projectile at the muzzle
-			World->SpawnActor<APortalProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, ActorSpawnParams);
-		}
-	}
 	
 	// Try and play the sound if specified
 	if (FireSound != nullptr)
@@ -66,7 +45,7 @@ void UTP_WeaponComponent::Fire()
 	}
 }
 
-bool UTP_WeaponComponent::AttachWeapon(APortalCharacter* TargetCharacter)
+bool UTP_WeaponComponent::AttachWeapon(APCharacter* TargetCharacter)
 {
 	Character = TargetCharacter;
 
