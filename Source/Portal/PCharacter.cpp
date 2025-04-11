@@ -1,7 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "PCharacter.h"
-#include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -145,6 +144,8 @@ void APCharacter::FindActorToGrab()
 	FocusedActor = nullptr;
 
 	TArray<FHitResult> HitResults;
+
+	const FCollisionObjectQueryParams QueryParams(CollisionChannel);
 	
 	FVector StartLocation;
 	FRotator StartRotation;
@@ -153,7 +154,7 @@ void APCharacter::FindActorToGrab()
 	const FVector EndLocation = StartLocation + StartRotation.Vector() * TraceDistance;
 	const FCollisionShape ColShape = FCollisionShape::MakeSphere(TraceRadius);
 
-	const bool bBlockingHit = GetWorld()->SweepMultiByChannel(HitResults, StartLocation, EndLocation, FQuat::Identity, CollisionChannel, ColShape);
+	const bool bBlockingHit = GetWorld()->SweepMultiByObjectType(HitResults, StartLocation, EndLocation, FQuat::Identity, QueryParams, ColShape);
 
 	if (bBlockingHit)
 	{
@@ -163,7 +164,7 @@ void APCharacter::FindActorToGrab()
 				DrawDebugSphere(GetWorld(), Hit.Location, TraceRadius, 32, FColor::Green, false, 0.0f);
 
 			AActor* HitActor = Hit.GetActor();
-			if (HitActor != nullptr)
+			if (IsValid(HitActor))
 			{
 				FocusedActor = HitActor;
 				break;
