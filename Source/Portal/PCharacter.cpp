@@ -7,6 +7,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "PGunComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 
@@ -14,7 +15,7 @@ DEFINE_LOG_CATEGORY(LogPortalCharacter);
 
 static TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
 
-APCharacter::APCharacter() : CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(300.0f), TraceRadius(30.0f), bIsGrabbingActor(false)
+APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(300.0f), TraceRadius(30.0f), bIsGrabbingActor(false)
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -34,12 +35,20 @@ APCharacter::APCharacter() : CollisionChannel(ECC_WorldDynamic), GrabDistance(15
 	//Mesh1P->SetRelativeRotation(FRotator(0.9f, -19.19f, 5.2f));
 	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
 
+	GunComp = CreateDefaultSubobject<UPGunComponent>(TEXT("PortalGun"));
+	GunComp->SetupAttachment(Mesh1P, GunSocketName);
+
 	PhysicsHandleComp = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandleComp"));
 }
 
 void APCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (IsValid(GunComp) == false)
+		return;
+
+	GunComp->Init(this);
 }
 
 void APCharacter::Tick(float DeltaSeconds)

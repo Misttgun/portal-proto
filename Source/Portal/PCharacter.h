@@ -7,6 +7,7 @@
 #include "Logging/LogMacros.h"
 #include "PCharacter.generated.h"
 
+class UPGunComponent;
 class UPhysicsHandleComponent;
 class UInputComponent;
 class USkeletalMeshComponent;
@@ -52,6 +53,14 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FirstPersonCameraComp;
 
+	// Portal Gun
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Weapon, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPGunComponent> GunComp;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Weapon, meta = (AllowPrivateAccess = "true"))
+	FName GunSocketName;
+
+	// Input Actions
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category= Input, meta=(AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> JumpAction;
 
@@ -64,6 +73,7 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category= Input, meta=(AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> GrabAction;
 
+	// Grab
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Grab, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPhysicsHandleComponent> PhysicsHandleComp;
 
