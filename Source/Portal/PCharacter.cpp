@@ -32,7 +32,6 @@ APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionC
 	Mesh1P->SetupAttachment(FirstPersonCameraComp);
 	Mesh1P->bCastDynamicShadow = false;
 	Mesh1P->CastShadow = false;
-	//Mesh1P->SetRelativeRotation(FRotator(0.9f, -19.19f, 5.2f));
 	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
 
 	GunComp = CreateDefaultSubobject<UPGunComponent>(TEXT("PortalGun"));
@@ -60,11 +59,7 @@ void APCharacter::Tick(float DeltaSeconds)
 
 	if (bIsGrabbingActor)
 	{
-		FVector EyeLocation;
-		FRotator EyeRotation;
-		GetActorEyesViewPoint(EyeLocation, EyeRotation);
-		
-		const FVector GrabLocation = EyeLocation + EyeRotation.Vector() * GrabDistance;
+		const FVector GrabLocation = FirstPersonCameraComp->GetComponentLocation() + FirstPersonCameraComp->GetForwardVector() * GrabDistance;
 		PhysicsHandleComp->SetTargetLocation(GrabLocation);
 		
 		return;
@@ -156,11 +151,8 @@ void APCharacter::FindActorToGrab()
 
 	const FCollisionObjectQueryParams QueryParams(CollisionChannel);
 	
-	FVector StartLocation;
-	FRotator StartRotation;
-	GetActorEyesViewPoint(StartLocation, StartRotation);
-
-	const FVector EndLocation = StartLocation + StartRotation.Vector() * TraceDistance;
+	const FVector StartLocation = FirstPersonCameraComp->GetComponentLocation();
+	const FVector EndLocation = StartLocation + FirstPersonCameraComp->GetForwardVector() * TraceDistance;
 	const FCollisionShape ColShape = FCollisionShape::MakeSphere(TraceRadius);
 
 	const bool bBlockingHit = GetWorld()->SweepMultiByObjectType(HitResults, StartLocation, EndLocation, FQuat::Identity, QueryParams, ColShape);
