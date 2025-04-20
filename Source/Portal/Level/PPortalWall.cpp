@@ -3,7 +3,10 @@
 
 #include "PPortalWall.h"
 #include "DrawDebugHelpers.h"
+#include "PPortal.h"
+#include "Kismet/GameplayStatics.h"
 
+static TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
 
 APPortalWall::APPortalWall() : Width{100.0f}, Height{100.0f}
 {
@@ -22,11 +25,13 @@ void APPortalWall::OnConstruction(const FTransform& Transform)
 	MeshComp->SetWorldScale3D(WorldScale);
 }
 
-bool APPortalWall::TryAddPortal(const FVector& Origin, const float PortalWidth, const float PortalHeight, const bool bIsLeftPortal) const
+bool APPortalWall::TryGetPortalPos(const FVector& Origin, const float PortalWidth, const float PortalHeight, const bool bIsLeftPortal, FVector& OutPortalPosition) const
 {
+	const bool bDrawDebug = CVarDebugDrawTrace.GetValueOnGameThread();
+
 	if (PortalWidth > Width || PortalHeight > Height)
 		return false;
-	
+
 	const float PortalHalfWidth = PortalWidth / 2;
 	const float PortalHalfHeight = PortalHeight / 2;
 
@@ -34,16 +39,20 @@ bool APPortalWall::TryAddPortal(const FVector& Origin, const float PortalWidth, 
 	const bool bIsOutsideWallZ = FMath::Abs(RelativeLocation.Z) + PortalHalfHeight > Height / 2;
 	const bool bIsOutsideWallY = FMath::Abs(RelativeLocation.Y) + PortalHalfWidth > Width / 2;
 
-	FVector PortalWorldLocation = Origin;
+	OutPortalPosition = Origin;
 
 	if (bIsOutsideWallY || bIsOutsideWallZ)
 	{
 		const FVector ConstrainedLocation = ConstrainPortalToWall(RelativeLocation, PortalHalfWidth, PortalHalfHeight);
-		PortalWorldLocation = GetTransform().TransformPosition(ConstrainedLocation);
+		OutPortalPosition = GetTransform().TransformPosition(ConstrainedLocation);
 	}
-	const FColor SphereColor = bIsLeftPortal ? FColor::Green : FColor::Orange;
-	DrawDebugSphere(GetWorld(), PortalWorldLocation, 10.0f, 12, SphereColor, false, 1.0f);
-	
+
+	if (bDrawDebug)
+	{
+		const FColor SphereColor = bIsLeftPortal ? FColor::Green : FColor::Orange;
+		DrawDebugSphere(GetWorld(), OutPortalPosition, 10.0f, 12, SphereColor, false, 1.0f);
+	}
+
 	return true;
 }
 
@@ -52,15 +61,15 @@ FVector APPortalWall::ConstrainPortalToWall(const FVector& RelativeLocation, con
 	constexpr float MinFloat = -1000000000.0f;
 
 	FVector ConstrainedLocation = RelativeLocation;
-	
+
 	// Vertical
 	const float ZPosition = RelativeLocation.Z;
 	float ZDelta = Height / 2 - PortalHalfHeight - FMath::Abs(ZPosition);
 	ZDelta = FMath::Clamp(ZDelta, MinFloat, 0.0f);
-	
+
 	if (ZPosition > 0.0f)
 		ZDelta *= -1.0f;
-	
+
 	ConstrainedLocation.Z -= ZDelta;
 
 	// Horizontal

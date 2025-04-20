@@ -12,6 +12,8 @@
 #include "Camera/CameraComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "Helpers/PMathHelper.h"
+#include "Level/PPortal.h"
 #include "Level/PPortalWall.h"
 
 UPGunComponent::UPGunComponent() : PortalWallChannel(ECC_WorldStatic), MaxPortalDistance(10000.0f), PortalSize(100, 50)
@@ -39,7 +41,7 @@ void UPGunComponent::Init(APCharacter* TargetCharacter)
 	}
 }
 
-void UPGunComponent::Fire(const bool bIsLeftPortal) const
+void UPGunComponent::Fire(const bool bIsLeftPortal)
 {
 	if (OwningCharacter == nullptr || OwningCharacter->GetController() == nullptr)
 		return;
@@ -72,7 +74,7 @@ void UPGunComponent::Fire(const bool bIsLeftPortal) const
 	const FCollisionObjectQueryParams QueryParams(PortalWallChannel);
 
 	FHitResult HitResult;
-	
+
 	const bool bBlockingHit = GetWorld()->LineTraceSingleByObjectType(HitResult, StartLocation, EndLocation, QueryParams);
 	if (bBlockingHit == false)
 		return;
@@ -81,16 +83,32 @@ void UPGunComponent::Fire(const bool bIsLeftPortal) const
 	if (IsValid(HitActor) == false)
 		return;
 
-	const APPortalWall* PortalWall = Cast<APPortalWall>(HitActor);
+	APPortalWall* PortalWall = Cast<APPortalWall>(HitActor);
 	if (PortalWall != nullptr)
 	{
-		const FVector PortalOrigin = HitResult.Location + HitResult.ImpactNormal;
-		const bool bHasPlaceWall = PortalWall->TryAddPortal(PortalOrigin, PortalSize.X, PortalSize.Y, bIsLeftPortal);
+		const auto Rotation = HitResult.ImpactNormal.Rotation();
+		const FVector Origin = HitResult.Location + HitResult.ImpactNormal;
+		FVector PortalLocation;
+		const bool bHasSpace = PortalWall->TryGetPortalPos(Origin, PortalSize.X, PortalSize.Y, bIsLeftPortal, PortalLocation);
 
-		if (bHasPlaceWall == false)
+		// Not enough space on the wall to spawn a portal
+		if (bHasSpace == false)
 		{
-			UE_LOG(LogTemp, Error, TEXT("'%s' Failed to place a Portal, wall is too small or a portal is already on this wall!"), *GetNameSafe(this));
+			// TODO Play failed portal placement FX
+			UE_LOG(LogTemp, Error, TEXT("'%s' Failed to place a Portal, wall is too small. or a portal is already on this wall!"), *GetNameSafe(this));
+			return;
 		}
+
+		// Check collision with the other portal
+		const bool bCanPlacePortal = IsPortalPlacementValid(PortalWall, bIsLeftPortal, PortalLocation);
+		if (bCanPlacePortal == false)
+		{
+			// TODO Play failed portal placement FX
+			UE_LOG(LogTemp, Error, TEXT("'%s' Failed to place a Portal, a portal is already on this wall!"), *GetNameSafe(this));
+			return;
+		}
+
+		SpawnPortal(PortalWall, Rotation, PortalLocation, bIsLeftPortal);
 	}
 	else
 	{
@@ -107,6 +125,77 @@ void UPGunComponent::PlaceLeftPortal()
 void UPGunComponent::PlaceRightPortal()
 {
 	Fire(false);
+}
+
+void UPGunComponent::SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, const bool bIsLeftPortal)
+{
+	if (bIsLeftPortal)
+	{
+		if (LeftPortal == nullptr)
+			LeftPortal = SpawnAndInitializePortal(PortalWall, Rotation, PortalLocation, bIsLeftPortal);
+		else
+			UpdatePortalTransform(LeftPortal, PortalLocation, Rotation);
+
+		FinalizePortalSetup(LeftPortal, PortalWall);
+	}
+	else
+	{
+		if (RightPortal == nullptr)
+			RightPortal = SpawnAndInitializePortal(PortalWall, Rotation, PortalLocation, bIsLeftPortal);
+		else
+			UpdatePortalTransform(RightPortal, PortalLocation, Rotation);
+
+		FinalizePortalSetup(RightPortal, PortalWall);
+	}
+}
+
+APPortal* UPGunComponent::SpawnAndInitializePortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, const bool bIsLeftPortal) const
+{
+	const FTransform SpawnTransform = FTransform(Rotation, PortalLocation);
+	APPortal* SpawnedPortal = GetWorld()->SpawnActorDeferred<APPortal>(PortalClass, SpawnTransform, PortalWall, OwningCharacter, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (SpawnedPortal)
+	{
+		SpawnedPortal->Init(bIsLeftPortal);
+		UGameplayStatics::FinishSpawningActor(SpawnedPortal, SpawnTransform);
+	}
+
+	return SpawnedPortal;
+}
+
+void UPGunComponent::UpdatePortalTransform(APPortal* Portal, const FVector& PortalLocation, const UE::Math::TRotator<double>& Rotation)
+{
+	Portal->SetActorRotation(Rotation);
+	Portal->SetActorLocation(PortalLocation);
+}
+
+void UPGunComponent::FinalizePortalSetup(APPortal* Portal, APPortalWall* PortalWall)
+{
+	Portal->CurrentWall = PortalWall;
+	Portal->OnPortalSpawned();
+}
+
+bool UPGunComponent::IsPortalPlacementValid(const APPortalWall* PortalWall, const bool bIsLeftPortal, const FVector& PortalLocation) const
+{
+	if (bIsLeftPortal)
+	{
+		if (RightPortal && RightPortal->CurrentWall == PortalWall)
+		{
+			const auto RightPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(RightPortal->GetActorLocation());
+			const auto LeftPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(PortalLocation);
+			return UPMathHelper::IsPortalColliding(RightPortalRelativeLocation, LeftPortalRelativeLocation, PortalSize) == false;
+		}
+	}
+	else
+	{
+		if (LeftPortal && LeftPortal->CurrentWall == PortalWall)
+		{
+			const auto LeftPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(LeftPortal->GetActorLocation());
+			const auto RightPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(PortalLocation);
+			return UPMathHelper::IsPortalColliding(LeftPortalRelativeLocation, RightPortalRelativeLocation, PortalSize) == false;
+		}
+	}
+
+	return true;
 }
 
 void UPGunComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

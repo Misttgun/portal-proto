@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Level/PPortalWall.h"
 #include "PGunComponent.generated.h"
 
+class APPortal;
 class UInputMappingContext;
 class APCharacter;
 class UInputAction;
@@ -19,13 +21,12 @@ public:
 	UPGunComponent();
 
 	void Init(APCharacter* TargetCharacter);
-	
 
 protected:
 	UFUNCTION()
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	void Fire(bool bIsLeftPortal) const;
+	void Fire(bool bIsLeftPortal);
 
 private:
 	UFUNCTION()
@@ -33,6 +34,13 @@ private:
 
 	UFUNCTION()
 	void PlaceRightPortal();
+
+	void SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, bool bIsLeftPortal);
+	APPortal* SpawnAndInitializePortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, bool bIsLeftPortal) const;
+	void UpdatePortalTransform(APPortal* Portal, const FVector& PortalLocation, const UE::Math::TRotator<double>& Rotation);
+	void FinalizePortalSetup(APPortal* Portal, APPortalWall* PortalWall);
+
+	bool IsPortalPlacementValid(const APPortalWall* PortalWall, bool bIsLeftPortal, const FVector& PortalLocation) const;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> FireSound;
@@ -59,6 +67,9 @@ private:
 
 	// Portal
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<APPortal> PortalClass;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
 	TEnumAsByte<ECollisionChannel> PortalWallChannel;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
@@ -66,4 +77,10 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
 	FVector2D PortalSize;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<APPortal> LeftPortal;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<APPortal> RightPortal;
 };

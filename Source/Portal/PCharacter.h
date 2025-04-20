@@ -31,7 +31,7 @@ public:
 	USkeletalMeshComponent* GetMesh1P() const { return Mesh1P; }
 	
 	/** Returns FirstPersonCameraComponent subobject **/
-	TObjectPtr<UCameraComponent> GetFirstPersonCameraComponent() const { return FirstPersonCameraComp; }
+	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComp; }
 
 protected:
 	virtual void BeginPlay() override;

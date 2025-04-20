@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "PPortalWall.generated.h"
 
+class APPortal;
+
 UCLASS()
 class PORTAL_API APPortalWall : public AActor
 {
@@ -16,7 +18,7 @@ public:
 	
 	virtual void OnConstruction(const FTransform& Transform) override;
 
-	bool TryAddPortal(const FVector& Origin, float PortalWidth, float PortalHeight, bool bIsLeftPortal) const;
+	bool TryGetPortalPos(const FVector& Origin, float PortalWidth, float PortalHeight, bool bIsLeftPortal, FVector& OutPortalPosition) const;
 
 private:
 	FVector ConstrainPortalToWall(const FVector& RelativeLocation, float PortalHalfWidth, float PortalHalfHeight) const;
