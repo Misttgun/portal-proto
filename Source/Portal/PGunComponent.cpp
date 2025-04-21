@@ -12,7 +12,7 @@
 #include "Camera/CameraComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
-#include "Helpers/PMathHelper.h"
+#include "Helpers/PPortalHelper.h"
 #include "Level/PPortal.h"
 #include "Level/PPortalWall.h"
 
@@ -147,6 +147,12 @@ void UPGunComponent::SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRota
 
 		FinalizePortalSetup(RightPortal, PortalWall);
 	}
+
+	if (LeftPortal)
+		LeftPortal->LinkPortal(RightPortal);
+
+	if (RightPortal)
+		RightPortal->LinkPortal(LeftPortal);
 }
 
 APPortal* UPGunComponent::SpawnAndInitializePortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, const bool bIsLeftPortal) const
@@ -182,7 +188,7 @@ bool UPGunComponent::IsPortalPlacementValid(const APPortalWall* PortalWall, cons
 		{
 			const auto RightPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(RightPortal->GetActorLocation());
 			const auto LeftPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(PortalLocation);
-			return UPMathHelper::IsPortalColliding(RightPortalRelativeLocation, LeftPortalRelativeLocation, PortalSize) == false;
+			return UPPortalHelper::IsPortalColliding(RightPortalRelativeLocation, LeftPortalRelativeLocation, PortalSize) == false;
 		}
 	}
 	else
@@ -191,7 +197,7 @@ bool UPGunComponent::IsPortalPlacementValid(const APPortalWall* PortalWall, cons
 		{
 			const auto LeftPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(LeftPortal->GetActorLocation());
 			const auto RightPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(PortalLocation);
-			return UPMathHelper::IsPortalColliding(LeftPortalRelativeLocation, RightPortalRelativeLocation, PortalSize) == false;
+			return UPPortalHelper::IsPortalColliding(LeftPortalRelativeLocation, RightPortalRelativeLocation, PortalSize) == false;
 		}
 	}
 

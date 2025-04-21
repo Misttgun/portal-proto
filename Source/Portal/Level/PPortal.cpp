@@ -5,10 +5,14 @@
 
 #include "PPortalWall.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Kismet/GameplayStatics.h"
+#include "Portal/Helpers/PPortalHelper.h"
 
 
-APPortal::APPortal() : CurrentWall(nullptr), bPortalLeft(true)
+APPortal::APPortal() : CurrentWall(nullptr), bPortalLeft(true), PortalRenderScale(1.0f), LinkedPortal(nullptr)
 {
+	PrimaryActorTick.bCanEverTick = true;
+	
 	RootComp = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	RootComp->SetupAttachment(RootComponent);
 
@@ -20,6 +24,10 @@ APPortal::APPortal() : CurrentWall(nullptr), bPortalLeft(true)
 
 	SceneCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("SceneCapture"));
 	SceneCapture->SetupAttachment(RootComp);
+
+	BackFacing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BackFacing"));
+	BackFacing->SetupAttachment(RootComp);
+	BackFacing->SetRelativeRotation(FRotator(0.0f, 180.0f, 0.0f)); // Rotate so it looks into the portal like a player would
 }
 
 void APPortal::OnConstruction(const FTransform& Transform)
@@ -43,8 +51,50 @@ void APPortal::OnConstruction(const FTransform& Transform)
 	}
 }
 
+void APPortal::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (IsValid(LinkedPortal) == false)
+		return;
+
+	USceneCaptureComponent2D* LinkedSceneCapture = LinkedPortal->SceneCapture;
+
+	FVector2D ViewportSize;
+	GEngine->GameViewport->GetViewportSize(ViewportSize);
+	UPPortalHelper::ResizeRenderTarget(LinkedSceneCapture->TextureTarget, ViewportSize.X * PortalRenderScale, ViewportSize.Y * PortalRenderScale);
+
+	const APlayerCameraManager* PlayerCameraManager = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0);
+	const FTransform CameraTransform = PlayerCameraManager->GetTransformComponent()->GetComponentTransform();
+
+	const float DistanceToCamera = FVector::Distance(CameraTransform.GetLocation(), GetActorLocation()) + 1.0f;
+	LinkedSceneCapture->CustomNearClippingPlane = DistanceToCamera;
+
+	const FTransform BackFacingTransform = BackFacing->GetComponentTransform();
+	const FTransform NewTransform =  CameraTransform.GetRelativeTransform(BackFacingTransform);
+	LinkedSceneCapture->SetRelativeLocationAndRotation(NewTransform.GetLocation(), NewTransform.GetRotation());
+}
+
 void APPortal::Init(const bool bIsLeftPortal)
 {
 	bPortalLeft = bIsLeftPortal;
 }
 
+void APPortal::LinkPortal(APPortal* OtherPortal)
+{
+	if (LinkedPortal != nullptr && LinkedPortal == OtherPortal)
+		return;
+	
+	if (IsValid(OtherPortal) == false)
+	{
+		PortalMesh->SetMaterial(0, DefaultPortalMaterial);
+		return;
+	}
+
+	LinkedPortal = OtherPortal;
+
+	if (bPortalLeft)
+		PortalMesh->SetMaterial(0, RightPortalRTMaterial);
+	else
+		PortalMesh->SetMaterial(0, LeftPortalRTMaterial);
+}

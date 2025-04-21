@@ -17,11 +17,15 @@ public:
 	APPortal();
 
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	void Init(bool bIsLeftPortal);
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Portal")
 	void OnPortalSpawned();
+
+	UFUNCTION(Blueprintcallable, Category = "Portal")
+	void LinkPortal(APPortal* OtherPortal);
 
 	UPROPERTY()
 	APPortalWall* CurrentWall;
@@ -29,6 +33,9 @@ public:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> RootComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USceneComponent> BackFacing;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> PortalBorderMesh;
@@ -42,6 +49,15 @@ private:
 	UPROPERTY(EditdefaultsOnly, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMaterialInterface> RightPortalMaterial;
 
+	UPROPERTY(EditdefaultsOnly, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMaterialInterface> LeftPortalRTMaterial;
+
+	UPROPERTY(EditdefaultsOnly, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMaterialInterface> RightPortalRTMaterial;
+
+	UPROPERTY(EditdefaultsOnly, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMaterialInterface> DefaultPortalMaterial;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneCaptureComponent2D> SceneCapture;
 
@@ -53,4 +69,10 @@ private:
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true", ExposeOnSpawn = "true"))
 	bool bPortalLeft;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
+	float PortalRenderScale;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<APPortal> LinkedPortal;
 };
