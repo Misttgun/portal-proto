@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "PPortal.generated.h"
 
+class UArrowComponent;
 class APPortalWall;
 
 UCLASS()
@@ -34,8 +35,8 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> RootComp;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USceneComponent> BackFacing;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UArrowComponent> BackFacingComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> PortalBorderMesh;

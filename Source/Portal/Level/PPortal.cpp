@@ -4,6 +4,7 @@
 #include "PPortal.h"
 
 #include "PPortalWall.h"
+#include "Components/ArrowComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Kismet/GameplayStatics.h"
 #include "Portal/Helpers/PPortalHelper.h"
@@ -25,9 +26,9 @@ APPortal::APPortal() : CurrentWall(nullptr), bPortalLeft(true), PortalRenderScal
 	SceneCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("SceneCapture"));
 	SceneCapture->SetupAttachment(RootComp);
 
-	BackFacing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BackFacing"));
-	BackFacing->SetupAttachment(RootComp);
-	BackFacing->SetRelativeRotation(FRotator(0.0f, 180.0f, 0.0f)); // Rotate so it looks into the portal like a player would
+	BackFacingComp = CreateDefaultSubobject<UArrowComponent>(TEXT("BackFacing"));
+	BackFacingComp->SetupAttachment(RootComp);
+	BackFacingComp->SetRelativeRotation(FRotator(0.0f, 180.0f, 0.0f)); // Rotate so it looks into the portal like a player would
 }
 
 void APPortal::OnConstruction(const FTransform& Transform)
@@ -70,7 +71,7 @@ void APPortal::Tick(float DeltaSeconds)
 	const float DistanceToCamera = FVector::Distance(CameraTransform.GetLocation(), GetActorLocation()) + 1.0f;
 	LinkedSceneCapture->CustomNearClippingPlane = DistanceToCamera;
 
-	const FTransform BackFacingTransform = BackFacing->GetComponentTransform();
+	const FTransform BackFacingTransform = BackFacingComp->GetComponentTransform();
 	const FTransform NewTransform =  CameraTransform.GetRelativeTransform(BackFacingTransform);
 	LinkedSceneCapture->SetRelativeLocationAndRotation(NewTransform.GetLocation(), NewTransform.GetRotation());
 }
