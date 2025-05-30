@@ -9,6 +9,8 @@
 APDoorTrigger::APDoorTrigger() : bIsActivated(false)
 {
 	BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Base"));
+	RootComponent = BaseMesh;
+	
 	TriggerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TriggerPlate"));
 	TriggerMesh->SetupAttachment(BaseMesh);
 	

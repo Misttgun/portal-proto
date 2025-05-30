@@ -14,3 +14,17 @@ void APPlayerController::BeginPlay()
 		Subsystem->AddMappingContext(InputMappingContext, 0);
 	}
 }
+
+FMatrix APPlayerController::GetCameraProjectionMatrix() const
+{
+	FMatrix ProjectionMatrix;
+
+	if (GetLocalPlayer() != nullptr)
+	{
+		FSceneViewProjectionData PlayerProjectionData;
+		GetLocalPlayer()->GetProjectionData(GetLocalPlayer()->ViewportClient->Viewport,PlayerProjectionData, static_cast<int32>(EStereoscopicPass::eSSP_FULL));
+		ProjectionMatrix = PlayerProjectionData.ProjectionMatrix;
+	}
+
+	return ProjectionMatrix;
+}

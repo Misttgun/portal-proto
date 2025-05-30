@@ -10,8 +10,11 @@ static TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), 
 
 APPortalWall::APPortalWall() : Width{100.0f}, Height{100.0f}
 {
+
+	
 	SceneRoot = CreateDefaultSubobject<USceneComponent>("SceneRoot");
-	SceneRoot->SetupAttachment(RootComponent);
+	//SceneRoot->SetupAttachment(RootComponent);
+	RootComponent = SceneRoot;
 
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
 	MeshComp->SetupAttachment(SceneRoot);

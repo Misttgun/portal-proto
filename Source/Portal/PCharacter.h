@@ -33,6 +33,8 @@ public:
 	/** Returns FirstPersonCameraComponent subobject **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComp; }
 
+	void OnPortalTeleport();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
@@ -40,6 +42,8 @@ protected:
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void ProcessGrab();
+
+	void ReturnToOrientation();
 
 private:
 	void GrabActor();
@@ -93,4 +97,9 @@ private:
 	AActor* FocusedActor;
 
 	bool bIsGrabbingActor;
+
+	// Player Orientation properties
+	bool bReturnToOrientation;
+	float OrientationReturnTimer;
+	FRotator OrientationAtStart;
 };

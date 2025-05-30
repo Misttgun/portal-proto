@@ -21,4 +21,7 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
 	UInputMappingContext* InputMappingContext;
+
+public:
+	FMatrix GetCameraProjectionMatrix() const;
 };

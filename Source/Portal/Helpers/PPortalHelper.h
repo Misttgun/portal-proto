@@ -6,6 +6,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "PPortalHelper.generated.h"
 
+class APPortal;
 /**
  * 
  */
@@ -20,4 +21,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	static void ResizeRenderTarget(UTextureRenderTarget2D* RenderTarget, float SizeX, float SizeY);
+
+	UFUNCTION(BlueprintCallable, Category = "Portal")
+	static FVector ConvertLocationToPortalSpace(FVector Location, APPortal* OriginPortal, APPortal* TargetPortal);
+
+	UFUNCTION(BlueprintCallable, Category = "Portal")
+	static FVector ConvertDirectionToPortalSpace(FVector Direction, APPortal* OriginPortal, APPortal* TargetPortal);
+
+	UFUNCTION(BlueprintCallable, Category = "Portal")
+	static FRotator ConvertRotationToPortalSpace(FRotator Rotation, APPortal* OriginPortal, APPortal* TargetPortal);
 };

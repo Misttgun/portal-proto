@@ -15,7 +15,8 @@ DEFINE_LOG_CATEGORY(LogPortalCharacter);
 
 static TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
 
-APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(300.0f), TraceRadius(30.0f), bIsGrabbingActor(false)
+APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(300.0f),
+                             TraceRadius(30.0f), bIsGrabbingActor(false), bReturnToOrientation(false)
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -57,11 +58,14 @@ void APCharacter::Tick(float DeltaSeconds)
 	if (IsLocallyControlled() == false)
 		return;
 
+	if (bReturnToOrientation)
+		ReturnToOrientation();
+
 	if (bIsGrabbingActor)
 	{
 		const FVector GrabLocation = FirstPersonCameraComp->GetComponentLocation() + FirstPersonCameraComp->GetForwardVector() * GrabDistance;
 		PhysicsHandleComp->SetTargetLocation(GrabLocation);
-		
+
 		return;
 	}
 
@@ -150,7 +154,7 @@ void APCharacter::FindActorToGrab()
 	TArray<FHitResult> HitResults;
 
 	const FCollisionObjectQueryParams QueryParams(CollisionChannel);
-	
+
 	const FVector StartLocation = FirstPersonCameraComp->GetComponentLocation();
 	const FVector EndLocation = StartLocation + FirstPersonCameraComp->GetForwardVector() * TraceDistance;
 	const FCollisionShape ColShape = FCollisionShape::MakeSphere(TraceRadius);
@@ -178,4 +182,23 @@ void APCharacter::FindActorToGrab()
 		const FColor LineColor = bBlockingHit ? FColor::Green : FColor::Red;
 		DrawDebugLine(GetWorld(), StartLocation, EndLocation, LineColor, false, 1.0f);
 	}
+}
+
+void APCharacter::OnPortalTeleport()
+{
+	OrientationReturnTimer = GetWorld()->GetTimeSeconds();
+	OrientationAtStart = GetCapsuleComponent()->GetComponentRotation();
+	bReturnToOrientation = true;
+}
+
+void APCharacter::ReturnToOrientation()
+{
+	const float Alpha = (GetWorld()->GetTimeSeconds() - OrientationReturnTimer) / 1.0f;
+	const FRotator CurrentOrientation = GetCapsuleComponent()->GetComponentRotation();
+	const FQuat Target = FRotator(0.0f, CurrentOrientation.Yaw, 0.0f).Quaternion();
+	const FQuat NewOrientation = FQuat::Slerp(CurrentOrientation.Quaternion(), Target, Alpha);
+	GetCapsuleComponent()->SetWorldRotation(NewOrientation.Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
+
+	if (Alpha >= 1.0f)
+		bReturnToOrientation = false;
 }
