@@ -13,7 +13,7 @@
 
 DEFINE_LOG_CATEGORY(LogPortalCharacter);
 
-static TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
+TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
 
 APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(300.0f),
                              TraceRadius(30.0f), bIsGrabbingActor(false), bReturnToOrientation(false)
@@ -129,6 +129,7 @@ void APCharacter::GrabActor()
 	UPrimitiveComponent* CompToGrab = FocusedActor->GetComponentByClass<UPrimitiveComponent>();
 	ensure(CompToGrab != nullptr);
 	PhysicsHandleComp->GrabComponentAtLocationWithRotation(CompToGrab, FName(), CompToGrab->GetComponentLocation(), FRotator::ZeroRotator);
+	CompToGrab->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	bIsGrabbingActor = true;
 
 	// Clear focus actor on grab
@@ -140,7 +141,12 @@ void APCharacter::ReleaseActor()
 	if (bIsGrabbingActor == false)
 		return;
 
-	PhysicsHandleComp->ReleaseComponent();
+	if (UPrimitiveComponent* GrabbedComp = PhysicsHandleComp->GetGrabbedComponent())
+	{
+		GrabbedComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		PhysicsHandleComp->ReleaseComponent();
+	}
+	
 	bIsGrabbingActor = false;
 }
 
@@ -189,6 +195,9 @@ void APCharacter::OnPortalTeleport()
 	OrientationReturnTimer = GetWorld()->GetTimeSeconds();
 	OrientationAtStart = GetCapsuleComponent()->GetComponentRotation();
 	bReturnToOrientation = true;
+
+	// TODO Implement a solution where we can keep holding actor through a portal and release it if we can't raycast to the thing we are holding.
+	// Will need to implement ray casting through portals.
 }
 
 void APCharacter::ReturnToOrientation()

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "PCharacter.generated.h"
 
 class UPGunComponent;
@@ -27,13 +28,17 @@ public:
 	APCharacter();
 	virtual void Tick(float DeltaSeconds) override;
 
+	void ReleaseActor();
+	void OnPortalTeleport();
+
 	/** Returns Mesh1P subobject **/
 	USkeletalMeshComponent* GetMesh1P() const { return Mesh1P; }
-	
+
 	/** Returns FirstPersonCameraComponent subobject **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComp; }
 
-	void OnPortalTeleport();
+	UPrimitiveComponent* GetGrabbedComponent() const { return PhysicsHandleComp->GetGrabbedComponent(); };
+
 
 protected:
 	virtual void BeginPlay() override;
@@ -47,9 +52,8 @@ protected:
 
 private:
 	void GrabActor();
-	void ReleaseActor();
 	void FindActorToGrab();
-	
+
 	/** Pawn mesh: 1st person view (arms; seen only by self) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category= Mesh, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> Mesh1P;
@@ -83,7 +87,7 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Grab, meta = (AllowPrivateAccess = "true"))
 	TEnumAsByte<ECollisionChannel> CollisionChannel;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Grab, meta = (AllowPrivateAccess = "true"))
 	float GrabDistance;
 

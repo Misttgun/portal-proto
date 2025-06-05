@@ -3,17 +3,12 @@
 
 #include "PPortalWall.h"
 #include "DrawDebugHelpers.h"
-#include "PPortal.h"
-#include "Kismet/GameplayStatics.h"
 
-static TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
+extern TAutoConsoleVariable<bool> CVarDebugDrawTrace;
 
 APPortalWall::APPortalWall() : Width{100.0f}, Height{100.0f}
 {
-
-	
 	SceneRoot = CreateDefaultSubobject<USceneComponent>("SceneRoot");
-	//SceneRoot->SetupAttachment(RootComponent);
 	RootComponent = SceneRoot;
 
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
@@ -61,6 +56,7 @@ bool APPortalWall::TryGetPortalPos(const FVector& Origin, const float PortalWidt
 
 FVector APPortalWall::ConstrainPortalToWall(const FVector& RelativeLocation, const float PortalHalfWidth, const float PortalHalfHeight) const
 {
+	//TODO Fix orientation bug when placing portal on rotated plane (ceiling and floor)
 	constexpr float MinFloat = -1000000000.0f;
 
 	FVector ConstrainedLocation = RelativeLocation;

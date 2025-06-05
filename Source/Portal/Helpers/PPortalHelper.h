@@ -6,7 +6,14 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "PPortalHelper.generated.h"
 
+/* Macro definitions for collision channels. */
+#define ECC_CompanionCube ECC_GameTraceChannel2
+#define ECC_PortalWall ECC_GameTraceChannel3
+#define ECC_Portal ECC_GameTraceChannel4
+#define ECC_PortalBox ECC_GameTraceChannel5
+
 class APPortal;
+
 /**
  * 
  */

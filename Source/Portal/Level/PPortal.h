@@ -7,12 +7,32 @@
 #include "PPortal.generated.h"
 
 class APCharacter;
+class UCameraComponent;
 class APPlayerController;
 class APPortalWall;
 class UBoxComponent;
 
 /* Logging category for this class. */
 DECLARE_LOG_CATEGORY_EXTERN(LogPortal, Log, All);
+
+/* Structure to hold important tracking information with each overlapping actor. */
+USTRUCT(BlueprintType)
+struct FTrackedActor
+{
+	GENERATED_BODY()
+
+	FVector LastTrackedLocation;
+
+	UPROPERTY()
+	USceneComponent* TrackedComp;
+
+	UPROPERTY()
+	AActor* TrackedCopy;
+
+	FTrackedActor() : LastTrackedLocation(FVector::ZeroVector), TrackedComp(nullptr), TrackedCopy(nullptr)
+	{
+	}
+};
 
 /* Post-physics update tick for updating position of physics driven actors. 
  * NOTE: This is irrelevant for a pawn that is not physics driven.
@@ -24,7 +44,7 @@ struct FPostPhysicsTick : public FActorTickFunction
 	GENERATED_BODY()
 
 	UPROPERTY()
-	class APPortal* Target;
+	class APPortal* Target = nullptr;
 
 	virtual void ExecuteTick(float DeltaTime, ELevelTick TickType, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent) override;
 };
@@ -42,7 +62,7 @@ class PORTAL_API APPortal : public AActor
 
 	/* Make post physics friend so it can access the tick function. */
 	friend FPostPhysicsTick;
-	
+
 public:
 	APPortal();
 
@@ -65,10 +85,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	void ClearPortalView() const;
 
-	/* Updates the world offset in the dynamic material instance for the vertexes on the portal mesh when the camera gets too close.
-	 * NOTE: Fix for near clipping plane clipping with the portal plane mesh. */
-	void UpdateWorldOffset() const;
-
 	UFUNCTION(BlueprintCallable, Category="Portal")
 	void TeleportActor(AActor* ActorToTeleport);
 
@@ -77,7 +93,7 @@ public:
 	bool IsPointInFrontOfPortal(const FVector& Point) const;
 
 	UFUNCTION(BlueprintCallable, Category="Portal")
-	bool IsPointCrossingPortal(const FVector& Point, FVector& OutIntersectionPoint) const;
+	bool IsPointCrossingPortal(const FVector& StartPoint, const FVector& Point, FVector& OutIntersectionPoint) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	bool IsPointInsidePortal(const FVector& Point) const;
@@ -87,21 +103,38 @@ public:
 	UPROPERTY()
 	APPortalWall* CurrentWall;
 
+	// Overlap
+	UFUNCTION(Category = "Portal")
+	void OnPortalBoxOverlapStart(UPrimitiveComponent* PortalMeshHit, AActor* OverlappedActor, UPrimitiveComponent* OverlappedComp, int32 OtherBodyIndex, bool FromSweep, const FHitResult& PortalHit);
+
+	UFUNCTION(Category = "Portal")
+	void OnPortalBoxOverlapEnd(UPrimitiveComponent* PortalMeshHit, AActor* OverlappedActor, UPrimitiveComponent* OverlappedComp, int32 OtherBodyIndex);
+
+	UFUNCTION(Category = "Portal")
+	void OnPortalMeshOverlapStart(UPrimitiveComponent* PortalMeshHit, AActor* OverlappedActor, UPrimitiveComponent* OverlappedComp, int32 OtherBodyIndex, bool FromSweep, const FHitResult& PortalHit);
+
+	UFUNCTION(Category = "Portal")
+	void OnPortalMeshOverlapEnd(UPrimitiveComponent* PortalMeshHit, AActor* OverlappedActor, UPrimitiveComponent* OverlappedComp, int32 OtherBodyIndex);
+
 protected:
 	virtual void BeginPlay() override;
 
-	/* Delayed setup function. */
-	UFUNCTION()
-	void Setup();
-
 	/* Post-physics ticking function. */
 	void PostPhysicsTick(float DeltaTime);
-	
+
 	/* Create a render texture target for this portal. */
 	void CreatePortalTexture();
 
-	/* Updates the pawns tracking for going through portals. Cannot rely on detecting overlaps. */
-	void UpdatePawnTracking();
+	void AddTrackedActor(AActor* ActorToAdd);
+	void RemoveTrackedActor(const AActor* ActorToRemove);
+
+	/* Hides a copied version of an actor from the main render pass so it still casts shadows. */
+	static void SetCopyVisibility(const AActor* Actor, bool IsVisible);
+
+	void CopyActor(AActor* ActorToCopy);
+	void DeleteCopy(const AActor* ActorToDelete);
+
+	void UpdateTrackedActors();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> PortalBorderMesh;
@@ -142,7 +175,7 @@ protected:
 	APPlayerController* PlayerController;
 
 	UPROPERTY()
-	APCharacter* PlayerCharacter;
+	UCameraComponent* PlayerCamera;
 
 	UPROPERTY()
 	UTextureRenderTarget2D* RenderTarget;
@@ -150,8 +183,12 @@ protected:
 	UPROPERTY()
 	UMaterialInstanceDynamic* PortalMaterial;
 
-private:
-	FVector LastPawnPosition; /* The pawns last tracked location for calculating when to teleport the player. */
+	UPROPERTY()
+	TMap<AActor*, FTrackedActor> TrackedActors; 
+
+	UPROPERTY()
+	TMap<AActor*, AActor*> CopiedActors; 
 	
 	bool bInitialized;
+	int ActorsBeingTracked;
 };

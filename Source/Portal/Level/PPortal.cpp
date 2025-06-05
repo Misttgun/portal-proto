@@ -15,11 +15,11 @@
 
 DEFINE_LOG_CATEGORY(LogPortal);
 
-APPortal::APPortal() : CurrentWall(nullptr), bPortalLeft(true), PortalRenderScale(1.0f), TargetPortal(nullptr), bInitialized(false)
+APPortal::APPortal() : CurrentWall(nullptr), bPortalLeft(true), PortalRenderScale(1.0f), TargetPortal(nullptr), bInitialized(false), ActorsBeingTracked(0)
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = TG_PostUpdateWork;
-	
+
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
 
 	PortalBorderMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PortalBorder"));
@@ -40,9 +40,9 @@ APPortal::APPortal() : CurrentWall(nullptr), bPortalLeft(true), PortalRenderScal
 	SceneCapture->bUseCustomProjectionMatrix = false;
 	SceneCapture->bCaptureEveryFrame = false;
 	SceneCapture->bCaptureOnMovement = false;
-	//SceneCapture->LODDistanceFactor = 3;
+	SceneCapture->LODDistanceFactor = 3;
 	SceneCapture->TextureTarget = nullptr;
-	SceneCapture->CaptureSource = SCS_SceneColorHDRNoAlpha; // Stores Scene Depth in A channel.
+	SceneCapture->CaptureSource = SCS_SceneColorHDR;
 
 	// Add post-physics ticking to this actor
 	PhysicsTick.bCanEverTick = true;
@@ -61,28 +61,20 @@ void APPortal::OnConstruction(const FTransform& Transform)
 		else
 			PortalBorderMesh->SetMaterial(0, RightPortalBorderMaterial);
 	}
-
-	// if (SceneCapture != nullptr)
-	// {
-	// 	if (bPortalLeft)
-	// 		SceneCapture->TextureTarget = LeftRenderTarget;
-	// 	else
-	// 		SceneCapture->TextureTarget = RightRenderTarget;
-	// }
 }
 
 void APPortal::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Save a ref to the player controller and player character
+	// Save a ref to the player controller and player camera
 	APPlayerController* PC = Cast<APPlayerController>(GetWorld()->GetFirstPlayerController());
 	if (PC != nullptr)
 		PlayerController = PC;
 
-	APCharacter* Character = Cast<APCharacter>(PC->GetPawn());
+	const APCharacter* Character = Cast<APCharacter>(PC->GetPawn());
 	if (Character != nullptr)
-		PlayerCharacter = Character;
+		PlayerCamera = Character->GetFirstPersonCameraComponent();
 
 	CreatePortalTexture();
 
@@ -92,27 +84,34 @@ void APPortal::BeginPlay()
 
 	bInitialized = true;
 
-	LastPawnPosition = PlayerCharacter->GetFirstPersonCameraComponent()->GetComponentLocation();
+	// If playing game and this is the game world, set up the delegate bindings
+	if (GetWorld() && GetWorld()->IsGameWorld())
+	{
+		PortalBox->OnComponentBeginOverlap.AddDynamic(this, &APPortal::OnPortalBoxOverlapStart);
+		PortalBox->OnComponentEndOverlap.AddDynamic(this, &APPortal::OnPortalBoxOverlapEnd);
+		PortalMesh->OnComponentBeginOverlap.AddDynamic(this, &APPortal::OnPortalMeshOverlapStart);
+		PortalMesh->OnComponentEndOverlap.AddDynamic(this, &APPortal::OnPortalMeshOverlapEnd);
+	}
 
-	PrimaryActorTick.SetTickFunctionEnable(true);
-
-	// Delay setup for 1 second
-	// PrimaryActorTick.SetTickFunctionEnable(false);
-	// FTimerHandle TimerHandle;
-	// FTimerDelegate TimerDelegate;
-	// TimerDelegate.BindUFunction(this, FName("Setup"));
-	// GetWorldTimerManager().SetTimer(TimerHandle, TimerDelegate, 1.0f, false);
-}
-
-void APPortal::Setup()
-{
-	// Register the secondary post-physics tick function in the world on level start
-	PhysicsTick.bCanEverTick = true;
-	PhysicsTick.RegisterTickFunction(GetWorld()->PersistentLevel);
-
-	bInitialized = true;
-
-	LastPawnPosition = PlayerCharacter->GetFirstPersonCameraComponent()->GetComponentLocation();
+	// Check if anything is already overlapping on begin play as overlap start will not be called in this case...
+	TSet<AActor*> OverlappingActors;
+	PortalBox->GetOverlappingActors(OverlappingActors);
+	if (OverlappingActors.Num() > 0)
+	{
+		// For each found overlapping actor on begin play check if it can move and started overlapping in-front of the portal, if so, track it until it ends its overlap.
+		for (AActor* OverlappedActor : OverlappingActors)
+		{
+			const USceneComponent* OverlappedRootComponent = OverlappedActor->GetRootComponent();
+			if (OverlappedRootComponent && OverlappedRootComponent->IsSimulatingPhysics() || OverlappedActor->IsA(APCharacter::StaticClass()))
+			{
+				// Ensure that the item entering the portal is in-front.
+				if (TrackedActors.Contains(OverlappedActor) == false && IsPointInFrontOfPortal(OverlappedRootComponent->GetComponentLocation()))
+				{
+					AddTrackedActor(OverlappedActor);
+				}
+			}
+		}
+	}
 
 	PrimaryActorTick.SetTickFunctionEnable(true);
 }
@@ -124,21 +123,62 @@ void APPortal::Tick(float DeltaSeconds)
 	if (bInitialized == false)
 		return;
 
-	PortalMaterial->SetScalarParameterValue(FName("ScaleOffset"), 0);
 	ClearPortalView();
 
 	if (TargetPortal == nullptr)
 		return;
 
 	UpdatePortalView();
-
-	if (IsPointInsidePortal(PlayerCharacter->GetFirstPersonCameraComponent()->GetComponentLocation()))
-		PortalMaterial->SetScalarParameterValue(FName("ScaleOffset"), 1.0f);
 }
 
 void APPortal::PostPhysicsTick(float DeltaTime)
 {
-	UpdatePawnTracking();
+	UpdateTrackedActors();
+}
+
+void APPortal::OnPortalBoxOverlapStart(UPrimitiveComponent*, AActor* OverlappedActor, UPrimitiveComponent*, int32, bool, const FHitResult&)
+{
+	const USceneComponent* OverlappedRootComponent = OverlappedActor->GetRootComponent();
+	if (OverlappedRootComponent && OverlappedRootComponent->IsSimulatingPhysics() || OverlappedActor->IsA(APCharacter::StaticClass()))
+	{
+		// Ensure that the item entering the portal is in-front.
+		if (TrackedActors.Contains(OverlappedActor) == false && IsPointInFrontOfPortal(OverlappedRootComponent->GetComponentLocation()))
+		{
+			AddTrackedActor(OverlappedActor);
+		}
+	}
+}
+
+void APPortal::OnPortalBoxOverlapEnd(UPrimitiveComponent*, AActor* OverlappedActor, UPrimitiveComponent*, int32)
+{
+	if (TrackedActors.Contains(OverlappedActor))
+	{
+		RemoveTrackedActor(OverlappedActor);
+	}
+}
+
+void APPortal::OnPortalMeshOverlapStart(UPrimitiveComponent*, AActor* OverlappedActor, UPrimitiveComponent*, int32, bool, const FHitResult&)
+{
+	// Show the copied actor once it's overlapping with the portal itself.
+	if (TrackedActors.Contains(OverlappedActor))
+	{
+		if (const AActor* Copy = TrackedActors.FindRef(OverlappedActor).TrackedCopy)
+		{
+			SetCopyVisibility(Copy, true);
+		}
+	}
+}
+
+void APPortal::OnPortalMeshOverlapEnd(UPrimitiveComponent*, AActor* OverlappedActor, UPrimitiveComponent*, int32)
+{
+	// Hide the copied actor once it's stopped overlapping with the portal by exiting it and not passing through it.
+	if (TrackedActors.Contains(OverlappedActor))
+	{
+		if (const AActor* Copy = TrackedActors.FindRef(OverlappedActor).TrackedCopy)
+		{
+			SetCopyVisibility(Copy, false);
+		}
+	}
 }
 
 void APPortal::Init(const bool bIsLeftPortal)
@@ -157,14 +197,12 @@ void APPortal::CreatePortalTexture()
 	check(RenderTarget);
 
 	RenderTarget->RenderTargetFormat = RTF_RGBA16f;
-	RenderTarget->Filter = TF_Bilinear;
 	RenderTarget->SizeX = ViewportX;
 	RenderTarget->SizeY = ViewportY;
 	RenderTarget->ClearColor = FLinearColor::Black;
 	RenderTarget->TargetGamma = 2.2f;
 	RenderTarget->bNeedsTwoCopies = false;
-	RenderTarget->AddressX = TA_Clamp;
-	RenderTarget->AddressY = TA_Clamp;
+	RenderTarget->bCanCreateUAV = false;
 
 	// Not needed since the texture is displayed on screen directly
 	RenderTarget->bAutoGenerateMips = false;
@@ -202,10 +240,10 @@ bool APPortal::IsPointInFrontOfPortal(const FVector& Point) const
 	return PortalDot >= 0.0f;
 }
 
-bool APPortal::IsPointCrossingPortal(const FVector& Point, FVector& OutIntersectionPoint) const
+bool APPortal::IsPointCrossingPortal(const FVector& StartPoint, const FVector& Point, FVector& OutIntersectionPoint) const
 {
 	const FPlane PortalPlane = FPlane(PortalMesh->GetComponentLocation(), PortalMesh->GetForwardVector());
-	const bool bIsIntersecting = FMath::SegmentPlaneIntersection(LastPawnPosition, Point, PortalPlane, OutIntersectionPoint);
+	const bool bIsIntersecting = FMath::SegmentPlaneIntersection(StartPoint, Point, PortalPlane, OutIntersectionPoint);
 
 	return bIsIntersecting;
 }
@@ -222,21 +260,212 @@ bool APPortal::IsPointInsidePortal(const FVector& Point) const
 	return bWithinX && bWithinY && bWithinZ;
 }
 
-void APPortal::UpdatePawnTracking()
+void APPortal::AddTrackedActor(AActor* ActorToAdd)
 {
-	FVector IntersectionPoint;
-	const FVector PawnPosition = PlayerCharacter->GetFirstPersonCameraComponent()->GetComponentLocation();
-	const bool bIsIntersecting = IsPointCrossingPortal(PawnPosition, IntersectionPoint);
-	const FVector RelativeIntersection = PortalMesh->GetComponentTransform().InverseTransformPositionNoScale(IntersectionPoint);
-	const FVector PortalSize = PortalBox->GetScaledBoxExtent();
-	const bool bPassedWithinPortal = FMath::Abs(RelativeIntersection.Z) <= PortalSize.Z && FMath::Abs(RelativeIntersection.Y) <= PortalSize.Y;
-	
-	if (bIsIntersecting && IsPointInFrontOfPortal(LastPawnPosition) && bPassedWithinPortal)
-		TeleportActor(PlayerCharacter);
+	if (ActorToAdd == nullptr)
+		return;
 
-	LastPawnPosition = PawnPosition;
+	// If it's the pawn track the camera otherwise track the root component
+	FTrackedActor Tracked;
+	if (ActorToAdd->IsA<APCharacter>())
+	{
+		Tracked.TrackedComp = PlayerCamera;
+		Tracked.LastTrackedLocation = PlayerCamera->GetComponentLocation();
+	}
+	else
+	{
+		Tracked.TrackedComp = ActorToAdd->GetRootComponent();
+		Tracked.LastTrackedLocation = ActorToAdd->GetActorLocation();
+	}
+
+	TrackedActors.Add(ActorToAdd, Tracked);
+	ActorsBeingTracked++;
+
+	// Create a visual copy of the tracked actor
+	CopyActor(ActorToAdd);
 }
 
+void APPortal::RemoveTrackedActor(const AActor* ActorToRemove)
+{
+	if (ActorToRemove == nullptr)
+		return;
+
+	// Delete copy if there is one
+	DeleteCopy(ActorToRemove);
+
+	TrackedActors.Remove(ActorToRemove);
+	ActorsBeingTracked--;
+}
+
+void APPortal::CopyActor(AActor* ActorToCopy)
+{
+	// Create a copy of the actor
+	if (ActorToCopy == nullptr)
+		return;
+
+	// Ignore the player for now
+	// TODO Handle player copy
+	if (ActorToCopy->IsA<APCharacter>())
+		return;
+
+	const FName NewActorName = MakeUniqueObjectName(this, AActor::StaticClass(), "CopiedActor");
+	AActor* NewActor = NewObject<AActor>(this, NewActorName, RF_NoFlags, ActorToCopy);
+	ensureMsgf(NewActor, TEXT("Failed to create new actor in CopyActor."));
+	if (NewActor == nullptr)
+		return;
+
+	NewActor->RegisterAllComponents();
+
+	TArray<UActorComponent*> StaticMeshes;
+	NewActor->GetComponents(UStaticMeshComponent::StaticClass(), StaticMeshes);
+
+	for (UActorComponent* Comp : StaticMeshes)
+	{
+		UStaticMeshComponent* StaticMeshComp = Cast<UStaticMeshComponent>(Comp);
+		StaticMeshComp->SetCollisionResponseToChannel(ECC_PortalBox, ECR_Ignore);
+		StaticMeshComp->SetCollisionResponseToChannel(ECC_PortalWall, ECR_Ignore);
+		StaticMeshComp->SetCollisionResponseToChannel(ECC_Portal, ECR_Ignore);
+		StaticMeshComp->SetCollisionResponseToChannel(ECC_CompanionCube, ECR_Ignore);
+		StaticMeshComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		StaticMeshComp->SetSimulatePhysics(false);
+	}
+
+	// Update the actor's tracking info
+	FTrackedActor Tracked = TrackedActors.FindRef(ActorToCopy);
+	Tracked.TrackedCopy = NewActor;
+	TrackedActors.Remove(ActorToCopy);
+	TrackedActors.Add(ActorToCopy, Tracked);
+
+	// Setup location and rotation for this frame
+	const FVector Location = UPPortalHelper::ConvertLocationToPortalSpace(NewActor->GetActorLocation(), this, TargetPortal);
+	const FRotator Rotation = UPPortalHelper::ConvertRotationToPortalSpace(NewActor->GetActorRotation(), this, TargetPortal);
+	NewActor->SetActorLocationAndRotation(Location, Rotation);
+
+	// Map copy to the original actor
+	CopiedActors.Add(NewActor, ActorToCopy);
+
+	// Hide the copy from the main pass until it is overlapping the portal mesh
+	SetCopyVisibility(NewActor, false);
+}
+
+void APPortal::DeleteCopy(const AActor* ActorToDelete)
+{
+	if (TrackedActors.Contains(ActorToDelete) == false)
+		return;
+
+	if (AActor* Copy = TrackedActors.FindRef(ActorToDelete).TrackedCopy)
+	{
+		CopiedActors.Remove(Copy);
+
+		if (IsValid(Copy) == false)
+			return;
+
+		if (UWorld* World = GetWorld())
+		{
+			World->DestroyActor(Copy);
+			Copy = nullptr;
+			GEngine->ForceGarbageCollection();
+		}
+	}
+}
+
+void APPortal::SetCopyVisibility(const AActor* Actor, const bool IsVisible)
+{
+	if (IsValid(Actor) == false)
+		return;
+
+	TArray<UActorComponent*> Components;
+	Actor->GetComponents(UStaticMeshComponent::StaticClass(), Components);
+	for (UActorComponent* Comp : Components)
+	{
+		UStaticMeshComponent* StaticComp = Cast<UStaticMeshComponent>(Comp);
+		StaticComp->SetRenderInMainPass(IsVisible);
+	}
+}
+
+void APPortal::UpdateTrackedActors()
+{
+	if (TargetPortal == nullptr)
+		return;
+	
+	if (ActorsBeingTracked <= 0)
+		return;
+
+	TArray<AActor*> TeleportedActors;
+	for (TMap<AActor*, FTrackedActor>::TIterator TrackedPair = TrackedActors.CreateIterator(); TrackedPair; ++TrackedPair)
+	{
+		AActor* TrackedActor = TrackedPair->Key;
+
+		// Update the positions for the duplicate tracked actors at the target portal
+		AActor* Copy = TrackedPair->Value.TrackedCopy;
+		if (IsValid(Copy))
+		{
+			const FVector ConvertedLocation = UPPortalHelper::ConvertLocationToPortalSpace(TrackedActor->GetActorLocation(), this, TargetPortal);
+			const FRotator ConvertedRotation = UPPortalHelper::ConvertRotationToPortalSpace(TrackedActor->GetActorRotation(), this, TargetPortal);
+			Copy->SetActorLocationAndRotation(ConvertedLocation, ConvertedRotation);
+		}
+
+		FTrackedActor TrackedInfo = TrackedPair->Value;
+		
+		bool bPassedThroughPortal;
+		FVector CurrPosition;
+		UPrimitiveComponent* Comp = Cast<UPrimitiveComponent>(TrackedActor->GetRootComponent());
+		if (TrackedActor->IsA<APCharacter>())
+		{
+			// We update the collision profile so we can pass through portals, but we do it only when the target portal is active
+			if (Comp->GetCollisionProfileName() != FName("PortalPawn"))
+				Comp->SetCollisionProfileName(FName("PortalPawn"));
+			
+			FVector IntersectionPoint;
+			CurrPosition = PlayerCamera->GetComponentLocation();
+			const bool bIsIntersecting = IsPointCrossingPortal(TrackedInfo.LastTrackedLocation, CurrPosition, IntersectionPoint);
+			const FVector RelativeIntersection = PortalMesh->GetComponentTransform().InverseTransformPositionNoScale(IntersectionPoint);
+			const FVector PortalSize = PortalBox->GetScaledBoxExtent();
+			const bool bWithinPortal = FMath::Abs(RelativeIntersection.Z) <= PortalSize.Z && FMath::Abs(RelativeIntersection.Y) <= PortalSize.Y;
+			bPassedThroughPortal = bIsIntersecting && IsPointInFrontOfPortal(TrackedInfo.LastTrackedLocation) && bWithinPortal;
+		}
+		else
+		{
+			// We update the collision profile so we can pass through portals, but we do it only when the target portal is active
+			if (Comp->GetCollisionProfileName() != FName("PortalCube"))
+				Comp->SetCollisionProfileName(FName("PortalCube"));
+			
+			FVector IntersectionPoint;
+			CurrPosition = TrackedInfo.TrackedComp->GetComponentLocation();
+			bPassedThroughPortal = IsPointCrossingPortal(TrackedInfo.LastTrackedLocation, CurrPosition, IntersectionPoint);
+		}
+
+		if (bPassedThroughPortal)
+		{
+			TeleportActor(TrackedActor);
+
+			// Add the actor to be removed after teleportation
+			TeleportedActors.Add(TrackedActor);
+
+			// Skip to the next actor
+			continue;
+		}
+
+		// Update the last tracked position if we don't teleport the actor
+		TrackedInfo.LastTrackedLocation = CurrPosition;
+	}
+
+	// Ensure the tracked actor has been removed, added to the target portal it's been teleported to, and it's copy is not hidden from the render pass
+	for (AActor* Actor : TeleportedActors)
+	{
+		if (IsValid(Actor) == false)
+			continue;
+
+		if (TrackedActors.Contains(Actor))
+			TrackedActors.Remove(Actor);
+
+		if (TargetPortal->TrackedActors.Contains(Actor) == false)
+			TargetPortal->TrackedActors.Add(Actor);
+
+		if (const AActor* Copy = TargetPortal->TrackedActors.FindRef(Actor).TrackedCopy)
+			SetCopyVisibility(Copy, true);
+	}
+}
 
 void APPortal::TeleportActor(AActor* ActorToTeleport)
 {
@@ -244,7 +473,7 @@ void APPortal::TeleportActor(AActor* ActorToTeleport)
 		return;
 
 	UE_LOG(LogPortal, Log, TEXT("Teleporting Actor %s"), *ActorToTeleport->GetName());
-	
+
 	// Perform a camera cut so the teleportation is seamless with the render functions
 	SceneCapture->bCameraCutThisFrame = true;
 
@@ -280,13 +509,37 @@ void APPortal::TeleportActor(AActor* ActorToTeleport)
 		const FVector NewVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(SavedVelocity, this, TargetPortal);
 		Character->GetCharacterMovement()->Velocity = NewVelocity;
 
+		Character->ReleaseActor();
 		Character->OnPortalTeleport();
 	}
+	else
+	{
+		UPrimitiveComponent* Comp = Cast<UPrimitiveComponent>(ActorToTeleport->GetRootComponent());
+		const FVector NewLinearVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsLinearVelocity(), this, TargetPortal);
+		const FVector NewAngularVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsAngularVelocityInDegrees(), this, TargetPortal);
+		Comp->SetPhysicsLinearVelocity(NewLinearVelocity);
+		Comp->SetPhysicsAngularVelocityInDegrees(NewAngularVelocity);
 
-	// Update the portal view and world offset for the target portal
-	TargetPortal->UpdateWorldOffset();
+		Character = Cast<APCharacter>(PlayerController->GetPawn());
+		if (Character != nullptr)
+		{
+			if (const UPrimitiveComponent* GrabbedComp = Character->GetGrabbedComponent())
+			{
+				if (GrabbedComp == Comp)
+					Character->ReleaseActor();
+			}
+		}
+	}
+
+	// Update the portal view for the target portal
 	TargetPortal->UpdatePortalView();
-	TargetPortal->LastPawnPosition = PlayerCharacter->GetFirstPersonCameraComponent()->GetComponentLocation();
+
+	// Make sure the copy created is not hidden after teleportation
+	if (TargetPortal->TrackedActors.Contains(ActorToTeleport))
+	{
+		if (const AActor* Copy = TargetPortal->TrackedActors.FindRef(ActorToTeleport).TrackedCopy)
+			SetCopyVisibility(Copy, true);
+	}
 }
 
 void APPortal::UpdatePortalView()
@@ -300,7 +553,6 @@ void APPortal::UpdatePortalView()
 	UPPortalHelper::ResizeRenderTarget(RenderTarget, ViewportX, ViewportY);
 
 	// Get the camera post-processing settings
-	const UCameraComponent* PlayerCamera = PlayerCharacter->GetFirstPersonCameraComponent();
 	SceneCapture->PostProcessSettings = PlayerCamera->PostProcessSettings;
 
 	// Setup clip plane to cut out objects between the camera and the back of the portal
@@ -320,8 +572,6 @@ void APPortal::UpdatePortalView()
 	// Update the scene capture position and rotation
 	SceneCapture->SetWorldLocationAndRotation(NewCameraLocation, NewCameraRotation);
 
-	//DrawDebugBox(GetWorld(), NewCameraLocation, FVector(10.0f), NewCameraRotation.Quaternion(), FColor::Red, false, 0.05f, 0.0f, 2.0f);
-
 	SceneCapture->CaptureScene();
 }
 
@@ -330,14 +580,6 @@ void APPortal::ClearPortalView() const
 	// Force portal to be a random color that can be found as a mask.
 	if (PortalMaterial != nullptr)
 		UKismetRenderingLibrary::ClearRenderTarget2D(GetWorld(), RenderTarget);
-}
-
-void APPortal::UpdateWorldOffset() const
-{
-	if (IsPointInsidePortal(PlayerCharacter->GetFirstPersonCameraComponent()->GetComponentLocation()))
-		PortalMaterial->SetScalarParameterValue(FName("ScaleOffset"), 1.0f);
-	else
-		PortalMaterial->SetScalarParameterValue(FName("ScaleOffset"), 0.0f);
 }
 
 void FPostPhysicsTick::ExecuteTick(float DeltaTime, enum ELevelTick TickType, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)
