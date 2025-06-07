@@ -7,6 +7,7 @@
 #include "Level/PPortalWall.h"
 #include "PGunComponent.generated.h"
 
+class APGhostPortalBorder;
 class APPortal;
 class UInputMappingContext;
 class APCharacter;
@@ -35,10 +36,10 @@ private:
 	UFUNCTION()
 	void PlaceRightPortal();
 
-	void SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, bool bIsLeftPortal);
+	void SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, bool bIsLeftPortal, bool bIsFloorPortal);
 	APPortal* SpawnAndInitializePortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, bool bIsLeftPortal) const;
 	void UpdatePortalTransform(APPortal* Portal, const FVector& PortalLocation, const UE::Math::TRotator<double>& Rotation);
-	void FinalizePortalSetup(APPortal* Portal, APPortalWall* PortalWall);
+	void FinalizePortalSetup(APPortal* Portal, APPortalWall* PortalWall, bool bIsFloorPortal);
 
 	bool IsPortalPlacementValid(const APPortalWall* PortalWall, bool bIsLeftPortal, const FVector& PortalLocation) const;
 	
@@ -68,6 +69,9 @@ private:
 	// Portal
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<APPortal> PortalClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<APGhostPortalBorder> PortalBorderGhostClass;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
 	TEnumAsByte<ECollisionChannel> PortalWallChannel;
@@ -83,4 +87,7 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<APPortal> RightPortal;
+
+	UPROPERTY()
+	APGhostPortalBorder* GhostBorder;
 };

@@ -248,18 +248,6 @@ bool APPortal::IsPointCrossingPortal(const FVector& StartPoint, const FVector& P
 	return bIsIntersecting;
 }
 
-bool APPortal::IsPointInsidePortal(const FVector& Point) const
-{
-	const FVector HalfHeight = PortalBox->GetScaledBoxExtent();
-	const FVector Direction = Point - PortalBox->GetComponentLocation();
-
-	const bool bWithinX = FMath::Abs(FVector::DotProduct(Direction, PortalBox->GetForwardVector())) <= HalfHeight.X;
-	const bool bWithinY = FMath::Abs(FVector::DotProduct(Direction, PortalBox->GetRightVector())) <= HalfHeight.Y;
-	const bool bWithinZ = FMath::Abs(FVector::DotProduct(Direction, PortalBox->GetUpVector())) <= HalfHeight.Z;
-
-	return bWithinX && bWithinY && bWithinZ;
-}
-
 void APPortal::AddTrackedActor(AActor* ActorToAdd)
 {
 	if (ActorToAdd == nullptr)
@@ -580,6 +568,14 @@ void APPortal::ClearPortalView() const
 	// Force portal to be a random color that can be found as a mask.
 	if (PortalMaterial != nullptr)
 		UKismetRenderingLibrary::ClearRenderTarget2D(GetWorld(), RenderTarget);
+}
+
+void APPortal::UpdatePortalBorderCollision(const bool bIsFloorPortal) const
+{
+	if (bIsFloorPortal)
+		PortalBorderMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	else
+		PortalBorderMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 }
 
 void FPostPhysicsTick::ExecuteTick(float DeltaTime, enum ELevelTick TickType, ENamedThreads::Type CurrentThread, const FGraphEventRef& MyCompletionGraphEvent)

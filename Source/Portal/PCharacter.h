@@ -39,6 +39,8 @@ public:
 
 	UPrimitiveComponent* GetGrabbedComponent() const { return PhysicsHandleComp->GetGrabbedComponent(); };
 
+	float GetWalkableFloorCos() const { return WalkableFloorCos; }
+
 
 protected:
 	virtual void BeginPlay() override;
@@ -106,4 +108,6 @@ private:
 	bool bReturnToOrientation;
 	float OrientationReturnTimer;
 	FRotator OrientationAtStart;
+
+	float WalkableFloorCos;
 };

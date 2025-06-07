@@ -9,6 +9,7 @@
 #include "InputActionValue.h"
 #include "PGunComponent.h"
 #include "Engine/LocalPlayer.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 
 DEFINE_LOG_CATEGORY(LogPortalCharacter);
@@ -44,6 +45,8 @@ APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionC
 void APCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	WalkableFloorCos = FMath::Cos(UE_DOUBLE_PI/(180.0) * GetCharacterMovement()->GetWalkableFloorAngle());
 
 	if (IsValid(GunComp) == false)
 		return;

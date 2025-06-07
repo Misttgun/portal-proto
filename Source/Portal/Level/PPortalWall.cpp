@@ -3,6 +3,7 @@
 
 #include "PPortalWall.h"
 #include "DrawDebugHelpers.h"
+#include "PGhostPortalBorder.h"
 
 extern TAutoConsoleVariable<bool> CVarDebugDrawTrace;
 
@@ -23,9 +24,41 @@ void APPortalWall::OnConstruction(const FTransform& Transform)
 	MeshComp->SetWorldScale3D(WorldScale);
 }
 
-bool APPortalWall::TryGetPortalPos(const FVector& Origin, const float PortalWidth, const float PortalHeight, const bool bIsLeftPortal, FVector& OutPortalPosition) const
+bool APPortalWall::TryGetPortalPos_Implementation(const FVector& Origin, const APGhostPortalBorder* GhostBorder, const bool bIsLeftPortal, FVector& OutPortalPosition) const
 {
 	const bool bDrawDebug = CVarDebugDrawTrace.GetValueOnGameThread();
+
+	TArray<FVector> Vertices = GhostBorder->GetVertices();
+	ensureMsgf(Vertices.Num() > 0, TEXT("Vertices is empty."));
+
+	TArray<FVector> WorldVertices;
+	const int32 NumVertices = Vertices.Num();
+	for (int32 i = 0; i < NumVertices; i++)
+	{
+		FVector RotatedVertex = GhostBorder->GetRelativeRotation().RotateVector(Vertices[i]);
+		FVector WorldVertex = GhostBorder->GetActorTransform().TransformPosition(RotatedVertex);
+
+		WorldVertices.Add(WorldVertex);
+	}
+
+	FVector LocalVertex = GetTransform().InverseTransformPosition(WorldVertices[0]);
+
+	float MaxZ, MaxY;
+	float MinZ = MaxZ = LocalVertex.Z;
+	float MinY = MaxY = LocalVertex.Y;
+
+	for (int i = 1; i < WorldVertices.Num(); ++i)
+	{
+		LocalVertex = GetTransform().InverseTransformPosition(WorldVertices[i]);
+
+		MinZ = FMath::Min(MinZ, LocalVertex.Z);
+		MinY = FMath::Min(MinY, LocalVertex.Y);
+		MaxZ = FMath::Max(MaxZ, LocalVertex.Z);
+		MaxY = FMath::Max(MaxY, LocalVertex.Y);
+	}
+
+	const float PortalWidth = MaxY - MinY;
+	const float PortalHeight = MaxZ - MinZ;
 
 	if (PortalWidth > Width || PortalHeight > Height)
 		return false;
@@ -33,7 +66,7 @@ bool APPortalWall::TryGetPortalPos(const FVector& Origin, const float PortalWidt
 	const float PortalHalfWidth = PortalWidth / 2;
 	const float PortalHalfHeight = PortalHeight / 2;
 
-	const UE::Math::TVector<double> RelativeLocation = GetTransform().InverseTransformPosition(Origin);
+	const FVector RelativeLocation = GetTransform().InverseTransformPosition(Origin);
 	const bool bIsOutsideWallZ = FMath::Abs(RelativeLocation.Z) + PortalHalfHeight > Height / 2;
 	const bool bIsOutsideWallY = FMath::Abs(RelativeLocation.Y) + PortalHalfWidth > Width / 2;
 
@@ -56,7 +89,6 @@ bool APPortalWall::TryGetPortalPos(const FVector& Origin, const float PortalWidt
 
 FVector APPortalWall::ConstrainPortalToWall(const FVector& RelativeLocation, const float PortalHalfWidth, const float PortalHalfHeight) const
 {
-	//TODO Fix orientation bug when placing portal on rotated plane (ceiling and floor)
 	constexpr float MinFloat = -1000000000.0f;
 
 	FVector ConstrainedLocation = RelativeLocation;

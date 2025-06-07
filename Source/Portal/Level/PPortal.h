@@ -35,8 +35,8 @@ struct FTrackedActor
 };
 
 /* Post-physics update tick for updating position of physics driven actors. 
- * NOTE: This is irrelevant for a pawn that is not physics driven.
- * NOTE: This is always a relevant way of tracking actors that are moving via physics.
+ NOTE: This is irrelevant for a pawn that is not physics driven.
+ NOTE: This is always a relevant way of tracking actors that are moving via physics.
  */
 USTRUCT()
 struct FPostPhysicsTick : public FActorTickFunction
@@ -95,13 +95,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Portal")
 	bool IsPointCrossingPortal(const FVector& StartPoint, const FVector& Point, FVector& OutIntersectionPoint) const;
 
-	UFUNCTION(BlueprintCallable, Category = "Portal")
-	bool IsPointInsidePortal(const FVector& Point) const;
-
 	UStaticMeshComponent* GetPortalMesh() const { return PortalMesh; };
 
 	UPROPERTY()
 	APPortalWall* CurrentWall;
+
+	void UpdatePortalBorderCollision(bool bIsFloorPortal) const;
 
 	// Overlap
 	UFUNCTION(Category = "Portal")
