@@ -36,12 +36,12 @@ private:
 	UFUNCTION()
 	void PlaceRightPortal();
 
-	void SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, bool bIsLeftPortal, bool bIsFloorPortal);
+	void SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, const FVector2D& PortalExtents, bool bIsLeftPortal, bool bIsFloorPortal);
 	APPortal* SpawnAndInitializePortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, bool bIsLeftPortal) const;
 	void UpdatePortalTransform(APPortal* Portal, const FVector& PortalLocation, const UE::Math::TRotator<double>& Rotation);
-	void FinalizePortalSetup(APPortal* Portal, APPortalWall* PortalWall, bool bIsFloorPortal);
+	void FinalizePortalSetup(APPortal* Portal, const FVector2D& PortalExtents, APPortalWall* PortalWall, bool bIsFloorPortal);
 
-	bool IsPortalPlacementValid(const APPortalWall* PortalWall, bool bIsLeftPortal, const FVector& PortalLocation) const;
+	bool IsPortalPlacementValid(const APPortalWall* PortalWall, bool bIsLeftPortal, const FVector& PortalLocation, const FVector2D& PortalExtents) const;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> FireSound;
@@ -78,9 +78,6 @@ private:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
 	float MaxPortalDistance;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
-	FVector2D PortalSize;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Portal, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<APPortal> LeftPortal;

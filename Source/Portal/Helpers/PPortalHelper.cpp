@@ -6,13 +6,10 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Portal/Level/PPortal.h"
 
-bool UPPortalHelper::IsPortalColliding(const FVector& OriginPortalA, const FVector& OriginPortalB, const FVector2D& PortalSize)
+bool UPPortalHelper::IsPortalColliding(const FVector& OriginPortalA, const FVector2D& PortalAExtents, const FVector& OriginPortalB, const FVector2D& PortalBExtents)
 {
-	const float HalfWidth = PortalSize.X / 2;
-	const float HalfHeight = PortalSize.Y / 2;
-
-	const bool bIsCollidingHorizontally = OriginPortalA.Y + HalfWidth > OriginPortalB.Y - HalfWidth && OriginPortalA.Y - HalfWidth < OriginPortalB.Y + HalfWidth;
-	const bool bIsCollidingVertically = OriginPortalA.Z + HalfHeight > OriginPortalB.Z - HalfHeight && OriginPortalA.Z - HalfHeight < OriginPortalB.Z + HalfHeight;
+	const bool bIsCollidingHorizontally = OriginPortalA.Y + PortalAExtents.X > OriginPortalB.Y - PortalBExtents.X && OriginPortalA.Y - PortalAExtents.X < OriginPortalB.Y + PortalBExtents.X;
+	const bool bIsCollidingVertically = OriginPortalA.Z + PortalAExtents.Y > OriginPortalB.Z - PortalBExtents.Y && OriginPortalA.Z - PortalAExtents.Y < OriginPortalB.Z + PortalBExtents.Y;
 
 	return bIsCollidingHorizontally && bIsCollidingVertically;
 }

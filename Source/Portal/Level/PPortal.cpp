@@ -324,7 +324,7 @@ void APPortal::CopyActor(AActor* ActorToCopy)
 	TrackedActors.Remove(ActorToCopy);
 	TrackedActors.Add(ActorToCopy, Tracked);
 
-	// Setup location and rotation for this frame
+	// Set up location and rotation for this frame
 	const FVector Location = UPPortalHelper::ConvertLocationToPortalSpace(NewActor->GetActorLocation(), this, TargetPortal);
 	const FRotator Rotation = UPPortalHelper::ConvertRotationToPortalSpace(NewActor->GetActorRotation(), this, TargetPortal);
 	NewActor->SetActorLocationAndRotation(Location, Rotation);
@@ -384,7 +384,7 @@ void APPortal::UpdateTrackedActors()
 	{
 		AActor* TrackedActor = TrackedPair->Key;
 
-		// Update the positions for the duplicate tracked actors at the target portal
+		// Update the positions for the duplicated tracked actors at the target portal
 		AActor* Copy = TrackedPair->Value.TrackedCopy;
 		if (IsValid(Copy))
 		{
@@ -497,25 +497,31 @@ void APPortal::TeleportActor(AActor* ActorToTeleport)
 		const FVector NewVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(SavedVelocity, this, TargetPortal);
 		Character->GetCharacterMovement()->Velocity = NewVelocity;
 
-		Character->ReleaseActor();
+		//Character->ReleaseActor();
 		Character->OnPortalTeleport();
 	}
 	else
 	{
 		UPrimitiveComponent* Comp = Cast<UPrimitiveComponent>(ActorToTeleport->GetRootComponent());
-		const FVector NewLinearVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsLinearVelocity(), this, TargetPortal);
-		const FVector NewAngularVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsAngularVelocityInDegrees(), this, TargetPortal);
-		Comp->SetPhysicsLinearVelocity(NewLinearVelocity);
-		Comp->SetPhysicsAngularVelocityInDegrees(NewAngularVelocity);
-
+		bool bIsGrabbed = false;
+		
 		Character = Cast<APCharacter>(PlayerController->GetPawn());
 		if (Character != nullptr)
 		{
 			if (const UPrimitiveComponent* GrabbedComp = Character->GetGrabbedComponent())
 			{
 				if (GrabbedComp == Comp)
-					Character->ReleaseActor();
+					bIsGrabbed = true;
+					//Character->ReleaseActor();
 			}
+		}
+
+		if (bIsGrabbed == false)
+		{
+			const FVector NewLinearVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsLinearVelocity(), this, TargetPortal);
+			const FVector NewAngularVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsAngularVelocityInDegrees(), this, TargetPortal);
+			Comp->SetPhysicsLinearVelocity(NewLinearVelocity);
+			Comp->SetPhysicsAngularVelocityInDegrees(NewAngularVelocity);
 		}
 	}
 

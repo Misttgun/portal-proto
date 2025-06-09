@@ -17,7 +17,7 @@
 #include "Level/PPortal.h"
 #include "Level/PPortalWall.h"
 
-UPGunComponent::UPGunComponent() : PortalWallChannel(ECC_WorldStatic), MaxPortalDistance(10000.0f), PortalSize(100, 50), GhostBorder(nullptr)
+UPGunComponent::UPGunComponent() : PortalWallChannel(ECC_WorldStatic), MaxPortalDistance(10000.0f), GhostBorder(nullptr)
 {
 	MuzzleOffset = FVector(100.0f, 0.0f, 10.0f);
 }
@@ -100,7 +100,7 @@ void UPGunComponent::Fire(const bool bIsLeftPortal)
 			const FMatrix RotationMatrix = FRotationMatrix::MakeFromX(HitResult.ImpactNormal);
 			Rotation = RotationMatrix.Rotator();
 		}
-		
+
 		const FVector Origin = HitResult.Location + HitResult.ImpactNormal;
 
 		if (GhostBorder == nullptr)
@@ -114,9 +114,10 @@ void UPGunComponent::Fire(const bool bIsLeftPortal)
 			GhostBorder->SetActorLocation(Origin);
 			GhostBorder->SetActorRotation(Rotation);
 		}
-		
+
 		FVector PortalLocation;
-		const bool bHasSpace = PortalWall->TryGetPortalPos(Origin, GhostBorder, bIsLeftPortal, PortalLocation);
+		FVector2D PortalExtents;
+		const bool bHasSpace = PortalWall->TryGetPortalPos(Origin, GhostBorder, bIsLeftPortal, PortalLocation, PortalExtents);
 
 		// Not enough space on the wall to spawn a portal
 		if (bHasSpace == false)
@@ -127,7 +128,7 @@ void UPGunComponent::Fire(const bool bIsLeftPortal)
 		}
 
 		// Check collision with the other portal
-		const bool bCanPlacePortal = IsPortalPlacementValid(PortalWall, bIsLeftPortal, PortalLocation);
+		const bool bCanPlacePortal = IsPortalPlacementValid(PortalWall, bIsLeftPortal, PortalLocation, PortalExtents);
 		if (bCanPlacePortal == false)
 		{
 			// TODO Play failed portal placement FX
@@ -135,7 +136,7 @@ void UPGunComponent::Fire(const bool bIsLeftPortal)
 			return;
 		}
 
-		SpawnPortal(PortalWall, Rotation, PortalLocation, bIsLeftPortal, bIsFloorOrCeiling);
+		SpawnPortal(PortalWall, Rotation, PortalLocation, PortalExtents, bIsLeftPortal, bIsFloorOrCeiling);
 	}
 	else
 	{
@@ -154,7 +155,7 @@ void UPGunComponent::PlaceRightPortal()
 	Fire(false);
 }
 
-void UPGunComponent::SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, const bool bIsLeftPortal, const bool bIsFloorPortal)
+void UPGunComponent::SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRotator<double>& Rotation, const FVector& PortalLocation, const FVector2D& PortalExtents, const bool bIsLeftPortal, const bool bIsFloorPortal)
 {
 	if (bIsLeftPortal)
 	{
@@ -163,7 +164,7 @@ void UPGunComponent::SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRota
 		else
 			UpdatePortalTransform(LeftPortal, PortalLocation, Rotation);
 
-		FinalizePortalSetup(LeftPortal, PortalWall, bIsFloorPortal);
+		FinalizePortalSetup(LeftPortal, PortalExtents, PortalWall, bIsFloorPortal);
 	}
 	else
 	{
@@ -172,7 +173,7 @@ void UPGunComponent::SpawnPortal(APPortalWall* PortalWall, const UE::Math::TRota
 		else
 			UpdatePortalTransform(RightPortal, PortalLocation, Rotation);
 
-		FinalizePortalSetup(RightPortal, PortalWall, bIsFloorPortal);
+		FinalizePortalSetup(RightPortal, PortalExtents, PortalWall, bIsFloorPortal);
 	}
 
 	if (LeftPortal)
@@ -201,14 +202,15 @@ void UPGunComponent::UpdatePortalTransform(APPortal* Portal, const FVector& Port
 	Portal->SetActorLocation(PortalLocation);
 }
 
-void UPGunComponent::FinalizePortalSetup(APPortal* Portal, APPortalWall* PortalWall, bool bIsFloorPortal)
+void UPGunComponent::FinalizePortalSetup(APPortal* Portal, const FVector2D& PortalExtents, APPortalWall* PortalWall, bool bIsFloorPortal)
 {
 	Portal->CurrentWall = PortalWall;
+	Portal->Extents = PortalExtents;
 	Portal->UpdatePortalBorderCollision(bIsFloorPortal);
 	Portal->OnPortalSpawned();
 }
 
-bool UPGunComponent::IsPortalPlacementValid(const APPortalWall* PortalWall, const bool bIsLeftPortal, const FVector& PortalLocation) const
+bool UPGunComponent::IsPortalPlacementValid(const APPortalWall* PortalWall, const bool bIsLeftPortal, const FVector& PortalLocation, const FVector2D& PortalExtents) const
 {
 	if (bIsLeftPortal)
 	{
@@ -216,7 +218,7 @@ bool UPGunComponent::IsPortalPlacementValid(const APPortalWall* PortalWall, cons
 		{
 			const auto RightPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(RightPortal->GetActorLocation());
 			const auto LeftPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(PortalLocation);
-			return UPPortalHelper::IsPortalColliding(RightPortalRelativeLocation, LeftPortalRelativeLocation, PortalSize) == false;
+			return UPPortalHelper::IsPortalColliding(RightPortalRelativeLocation, RightPortal->Extents, LeftPortalRelativeLocation, PortalExtents) == false;
 		}
 	}
 	else
@@ -225,7 +227,7 @@ bool UPGunComponent::IsPortalPlacementValid(const APPortalWall* PortalWall, cons
 		{
 			const auto LeftPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(LeftPortal->GetActorLocation());
 			const auto RightPortalRelativeLocation = PortalWall->GetTransform().InverseTransformPosition(PortalLocation);
-			return UPPortalHelper::IsPortalColliding(LeftPortalRelativeLocation, RightPortalRelativeLocation, PortalSize) == false;
+			return UPPortalHelper::IsPortalColliding(LeftPortalRelativeLocation, LeftPortal->Extents, RightPortalRelativeLocation, PortalExtents) == false;
 		}
 	}
 

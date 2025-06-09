@@ -96,6 +96,7 @@ public:
 	bool IsPointCrossingPortal(const FVector& StartPoint, const FVector& Point, FVector& OutIntersectionPoint) const;
 
 	UStaticMeshComponent* GetPortalMesh() const { return PortalMesh; };
+	APPortal* GetLinkedPortal() const { return TargetPortal; };
 
 	UPROPERTY()
 	APPortalWall* CurrentWall;
@@ -114,6 +115,9 @@ public:
 
 	UFUNCTION(Category = "Portal")
 	void OnPortalMeshOverlapEnd(UPrimitiveComponent* PortalMeshHit, AActor* OverlappedActor, UPrimitiveComponent* OverlappedComp, int32 OtherBodyIndex);
+
+	// Portal extents when placed on a wall
+	FVector2D Extents;
 
 protected:
 	virtual void BeginPlay() override;

@@ -55,6 +55,7 @@ protected:
 private:
 	void GrabActor();
 	void FindActorToGrab();
+	void UpdateGrabbedActorPos() const;
 
 	/** Pawn mesh: 1st person view (arms; seen only by self) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category= Mesh, meta = (AllowPrivateAccess = "true"))
@@ -103,6 +104,7 @@ private:
 	AActor* FocusedActor;
 
 	bool bIsGrabbingActor;
+	FVector GrabbedRelativeLocation;
 
 	// Player Orientation properties
 	bool bReturnToOrientation;

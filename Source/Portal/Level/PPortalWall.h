@@ -20,7 +20,7 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Portal")
-	bool TryGetPortalPos(const FVector& Origin, const APGhostPortalBorder* GhostBorder, bool bIsLeftPortal, FVector& OutPortalPosition) const;
+	bool TryGetPortalPos(const FVector& Origin, const APGhostPortalBorder* GhostBorder, bool bIsLeftPortal, FVector& OutPortalPosition, FVector2D& OutPortalExtents) const;
 
 private:
 	FVector ConstrainPortalToWall(const FVector& RelativeLocation, float PortalHalfWidth, float PortalHalfHeight) const;

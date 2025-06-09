@@ -10,14 +10,16 @@
 #include "PGunComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Helpers/PPortalHelper.h"
+#include "Level/PPortal.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 
 DEFINE_LOG_CATEGORY(LogPortalCharacter);
 
 TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
 
-APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(300.0f),
-                             TraceRadius(30.0f), bIsGrabbingActor(false), bReturnToOrientation(false)
+APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(150.0f),
+                             TraceRadius(15.0f), bIsGrabbingActor(false), bReturnToOrientation(false)
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -66,9 +68,7 @@ void APCharacter::Tick(float DeltaSeconds)
 
 	if (bIsGrabbingActor)
 	{
-		const FVector GrabLocation = FirstPersonCameraComp->GetComponentLocation() + FirstPersonCameraComp->GetForwardVector() * GrabDistance;
-		PhysicsHandleComp->SetTargetLocation(GrabLocation);
-
+		UpdateGrabbedActorPos();
 		return;
 	}
 
@@ -131,7 +131,8 @@ void APCharacter::GrabActor()
 
 	UPrimitiveComponent* CompToGrab = FocusedActor->GetComponentByClass<UPrimitiveComponent>();
 	ensure(CompToGrab != nullptr);
-	PhysicsHandleComp->GrabComponentAtLocationWithRotation(CompToGrab, FName(), CompToGrab->GetComponentLocation(), FRotator::ZeroRotator);
+	GrabbedRelativeLocation = FirstPersonCameraComp->GetComponentTransform().InverseTransformPositionNoScale(CompToGrab->GetComponentLocation());
+	PhysicsHandleComp->GrabComponentAtLocationWithRotation(CompToGrab, NAME_None, CompToGrab->GetComponentLocation(), FRotator::ZeroRotator);
 	CompToGrab->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	bIsGrabbingActor = true;
 
@@ -191,6 +192,35 @@ void APCharacter::FindActorToGrab()
 		const FColor LineColor = bBlockingHit ? FColor::Green : FColor::Red;
 		DrawDebugLine(GetWorld(), StartLocation, EndLocation, LineColor, false, 1.0f);
 	}
+}
+
+void APCharacter::UpdateGrabbedActorPos() const
+{
+	const FVector NewLocation = FirstPersonCameraComp->GetComponentTransform().TransformPositionNoScale(GrabbedRelativeLocation);
+
+	FHitResult HitResult;
+	
+	FCollisionObjectQueryParams QueryParams;
+	QueryParams.AddObjectTypesToQuery(ECC_Portal);
+	
+	FCollisionQueryParams CollisionQueryParams;
+	CollisionQueryParams.AddIgnoredActor(this);
+	CollisionQueryParams.AddIgnoredActor(PhysicsHandleComp->GetGrabbedComponent()->GetOwner());
+
+	const bool bHit = GetWorld()->LineTraceSingleByObjectType(HitResult, FirstPersonCameraComp->GetComponentLocation(), NewLocation, QueryParams, CollisionQueryParams);
+	if (bHit)
+	{
+		if (APPortal* HitPortal = Cast<APPortal>(HitResult.GetActor()))
+		{
+			const FVector Location = UPPortalHelper::ConvertLocationToPortalSpace(NewLocation, HitPortal, HitPortal->GetLinkedPortal());
+			PhysicsHandleComp->SetTargetLocation(Location);
+		}
+	}
+	else
+	{
+		PhysicsHandleComp->SetTargetLocation(NewLocation);
+	}
+	
 }
 
 void APCharacter::OnPortalTeleport()

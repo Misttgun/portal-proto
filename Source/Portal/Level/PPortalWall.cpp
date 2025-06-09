@@ -24,7 +24,7 @@ void APPortalWall::OnConstruction(const FTransform& Transform)
 	MeshComp->SetWorldScale3D(WorldScale);
 }
 
-bool APPortalWall::TryGetPortalPos_Implementation(const FVector& Origin, const APGhostPortalBorder* GhostBorder, const bool bIsLeftPortal, FVector& OutPortalPosition) const
+bool APPortalWall::TryGetPortalPos_Implementation(const FVector& Origin, const APGhostPortalBorder* GhostBorder, const bool bIsLeftPortal, FVector& OutPortalPosition, FVector2D& OutPortalExtents) const
 {
 	const bool bDrawDebug = CVarDebugDrawTrace.GetValueOnGameThread();
 
@@ -65,6 +65,8 @@ bool APPortalWall::TryGetPortalPos_Implementation(const FVector& Origin, const A
 
 	const float PortalHalfWidth = PortalWidth / 2;
 	const float PortalHalfHeight = PortalHeight / 2;
+
+	OutPortalExtents = FVector2D(PortalHalfWidth, PortalHalfHeight);
 
 	const FVector RelativeLocation = GetTransform().InverseTransformPosition(Origin);
 	const bool bIsOutsideWallZ = FMath::Abs(RelativeLocation.Z) + PortalHalfHeight > Height / 2;

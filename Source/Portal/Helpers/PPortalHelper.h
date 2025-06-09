@@ -24,7 +24,7 @@ class PORTAL_API UPPortalHelper : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Portal")
-	static bool IsPortalColliding(const FVector& OriginPortalA, const FVector& OriginPortalB, const FVector2D& PortalSize);
+	static bool IsPortalColliding(const FVector& OriginPortalA, const FVector2D& PortalAExtents, const FVector& OriginPortalB, const FVector2D& PortalBExtents);
 
 	UFUNCTION(BlueprintCallable, Category = "Portal")
 	static void ResizeRenderTarget(UTextureRenderTarget2D* RenderTarget, float SizeX, float SizeY);
