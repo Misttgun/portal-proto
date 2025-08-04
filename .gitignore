@@ -1,9 +1,12 @@
 # UE4 generated files
 Binaries/
+Build/
 Intermediate/
 Saved/
 
 # C++ IDE files for Visual Studio and Rider
 .vs/
+.vsconfig
 *.sln
 .idea/
+Portal.uproject.DotSettings.user
