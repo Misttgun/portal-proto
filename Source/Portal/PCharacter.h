@@ -8,6 +8,7 @@
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "PCharacter.generated.h"
 
+class APPortal;
 class UPGunComponent;
 class UPhysicsHandleComponent;
 class UInputComponent;
@@ -55,7 +56,8 @@ protected:
 private:
 	void GrabActor();
 	void FindActorToGrab();
-	void UpdateGrabbedActorPos() const;
+	bool FindActorToGrabThroughPortal(bool bDrawDebug, const FVector& EndLocation, FCollisionShape ColShape, const FHitResult& Hit, APPortal* HitPortal);
+	void UpdateGrabbedActorPos();
 
 	/** Pawn mesh: 1st person view (arms; seen only by self) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category= Mesh, meta = (AllowPrivateAccess = "true"))
@@ -92,9 +94,6 @@ private:
 	TEnumAsByte<ECollisionChannel> CollisionChannel;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Grab, meta = (AllowPrivateAccess = "true"))
-	float GrabDistance;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Grab, meta = (AllowPrivateAccess = "true"))
 	float TraceDistance;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Grab, meta = (AllowPrivateAccess = "true"))
@@ -104,6 +103,7 @@ private:
 	AActor* FocusedActor;
 
 	bool bIsGrabbingActor;
+	bool bIsGrabbingThroughPortal;
 	FVector GrabbedRelativeLocation;
 
 	// Player Orientation properties

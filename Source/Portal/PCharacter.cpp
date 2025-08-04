@@ -18,8 +18,8 @@ DEFINE_LOG_CATEGORY(LogPortalCharacter);
 
 TAutoConsoleVariable<bool> CVarDebugDrawTrace(TEXT("sm.TraceDebugDraw"), false, TEXT("Enable Debug Lines for Character Traces"), ECVF_Cheat);
 
-APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), GrabDistance(150.0f), TraceDistance(150.0f),
-                             TraceRadius(15.0f), bIsGrabbingActor(false), bReturnToOrientation(false)
+APCharacter::APCharacter() : GunSocketName(FName(TEXT("GripPoint"))), CollisionChannel(ECC_WorldDynamic), TraceDistance(150.0f),
+                             TraceRadius(15.0f), bIsGrabbingActor(false), bIsGrabbingThroughPortal(false), bReturnToOrientation(false)
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -48,7 +48,7 @@ void APCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	WalkableFloorCos = FMath::Cos(UE_DOUBLE_PI/(180.0) * GetCharacterMovement()->GetWalkableFloorAngle());
+	WalkableFloorCos = FMath::Cos(UE_DOUBLE_PI / (180.0) * GetCharacterMovement()->GetWalkableFloorAngle());
 
 	if (IsValid(GunComp) == false)
 		return;
@@ -131,9 +131,13 @@ void APCharacter::GrabActor()
 
 	UPrimitiveComponent* CompToGrab = FocusedActor->GetComponentByClass<UPrimitiveComponent>();
 	ensure(CompToGrab != nullptr);
-	GrabbedRelativeLocation = FirstPersonCameraComp->GetComponentTransform().InverseTransformPositionNoScale(CompToGrab->GetComponentLocation());
+
+	if (bIsGrabbingThroughPortal == false)
+		GrabbedRelativeLocation = FirstPersonCameraComp->GetComponentTransform().InverseTransformPositionNoScale(CompToGrab->GetComponentLocation());
+
 	PhysicsHandleComp->GrabComponentAtLocationWithRotation(CompToGrab, NAME_None, CompToGrab->GetComponentLocation(), FRotator::ZeroRotator);
 	CompToGrab->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
 	bIsGrabbingActor = true;
 
 	// Clear focus actor on grab
@@ -150,7 +154,7 @@ void APCharacter::ReleaseActor()
 		GrabbedComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 		PhysicsHandleComp->ReleaseComponent();
 	}
-	
+
 	bIsGrabbingActor = false;
 }
 
@@ -160,10 +164,13 @@ void APCharacter::FindActorToGrab()
 
 	// Clear previous focus actor
 	FocusedActor = nullptr;
+	bIsGrabbingThroughPortal = false;
 
 	TArray<FHitResult> HitResults;
 
-	const FCollisionObjectQueryParams QueryParams(CollisionChannel);
+	FCollisionObjectQueryParams QueryParams;
+	QueryParams.AddObjectTypesToQuery(CollisionChannel);
+	QueryParams.AddObjectTypesToQuery(ECC_Portal);
 
 	const FVector StartLocation = FirstPersonCameraComp->GetComponentLocation();
 	const FVector EndLocation = StartLocation + FirstPersonCameraComp->GetForwardVector() * TraceDistance;
@@ -176,51 +183,108 @@ void APCharacter::FindActorToGrab()
 		for (FHitResult Hit : HitResults)
 		{
 			if (bDrawDebug)
-				DrawDebugSphere(GetWorld(), Hit.Location, TraceRadius, 32, FColor::Green, false, 0.0f);
+			{
+				DrawDebugLine(GetWorld(), StartLocation, Hit.ImpactPoint, FColor::Green, false, 1.0f);
+				DrawDebugSphere(GetWorld(), Hit.ImpactPoint, TraceRadius, 32, FColor::Green, false, 0.0f);
+			}
 
 			AActor* HitActor = Hit.GetActor();
 			if (IsValid(HitActor))
 			{
-				FocusedActor = HitActor;
-				break;
+				// Trace through a portal so we can pick up the companion cube relative to the portal
+				APPortal* HitPortal = Cast<APPortal>(HitActor);
+				if (HitPortal && HitPortal->GetLinkedPortal() != nullptr)
+				{
+					if (FindActorToGrabThroughPortal(bDrawDebug, EndLocation, ColShape, Hit, HitPortal))
+						return;
+				}
+				else
+				{
+					FocusedActor = HitActor;
+					return;
+				}
 			}
 		}
 	}
-
-	if (bDrawDebug)
+	else
 	{
-		const FColor LineColor = bBlockingHit ? FColor::Green : FColor::Red;
-		DrawDebugLine(GetWorld(), StartLocation, EndLocation, LineColor, false, 1.0f);
+		if (bDrawDebug)
+			DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Red, false, 1.0f);
 	}
 }
 
-void APCharacter::UpdateGrabbedActorPos() const
+bool APCharacter::FindActorToGrabThroughPortal(const bool bDrawDebug, const FVector& EndLocation, const FCollisionShape ColShape, const FHitResult& Hit, APPortal* HitPortal)
+{
+	const FVector NewStartLocation = UPPortalHelper::ConvertLocationToPortalSpace(Hit.ImpactPoint, HitPortal, HitPortal->GetLinkedPortal());
+	const FVector NewEndLocation = UPPortalHelper::ConvertLocationToPortalSpace(EndLocation, HitPortal, HitPortal->GetLinkedPortal());
+
+	FCollisionObjectQueryParams NewQueryParams;
+	NewQueryParams.AddObjectTypesToQuery(CollisionChannel);
+
+	TArray<FHitResult> NewHitResults;
+	const bool bNewHit = GetWorld()->SweepMultiByObjectType(NewHitResults, NewStartLocation, NewEndLocation, FQuat::Identity, NewQueryParams, ColShape);
+	if (bNewHit)
+	{
+		for (FHitResult NewHit : NewHitResults)
+		{
+			AActor* NewHitActor = NewHit.GetActor();
+			if (IsValid(NewHitActor))
+			{
+				if (bDrawDebug)
+				{
+					DrawDebugLine(GetWorld(), NewStartLocation, NewHit.ImpactPoint, FColor::Green, false, 1.0f);
+					DrawDebugSphere(GetWorld(), NewHit.Location, TraceRadius, 32, FColor::Green, false, 0.0f);
+				}
+
+				FocusedActor = NewHitActor;
+				bIsGrabbingThroughPortal = true;
+
+				const USceneComponent* FocusedComp = NewHitActor->GetRootComponent();
+				const FVector GrabLocation = UPPortalHelper::ConvertLocationToPortalSpace(FocusedComp->GetComponentLocation(), HitPortal, HitPortal->GetLinkedPortal());
+				GrabbedRelativeLocation = FirstPersonCameraComp->GetComponentTransform().InverseTransformPositionNoScale(GrabLocation);
+
+				return true;
+			}
+		}
+	}
+	else
+	{
+		if (bDrawDebug)
+			DrawDebugLine(GetWorld(), NewStartLocation, NewEndLocation, FColor::Red, false, 1.0f);
+	}
+
+	return false;
+}
+
+void APCharacter::UpdateGrabbedActorPos()
 {
 	const FVector NewLocation = FirstPersonCameraComp->GetComponentTransform().TransformPositionNoScale(GrabbedRelativeLocation);
 
-	FHitResult HitResult;
-	
-	FCollisionObjectQueryParams QueryParams;
-	QueryParams.AddObjectTypesToQuery(ECC_Portal);
-	
-	FCollisionQueryParams CollisionQueryParams;
-	CollisionQueryParams.AddIgnoredActor(this);
-	CollisionQueryParams.AddIgnoredActor(PhysicsHandleComp->GetGrabbedComponent()->GetOwner());
-
-	const bool bHit = GetWorld()->LineTraceSingleByObjectType(HitResult, FirstPersonCameraComp->GetComponentLocation(), NewLocation, QueryParams, CollisionQueryParams);
-	if (bHit)
+	if (bIsGrabbingThroughPortal)
 	{
-		if (APPortal* HitPortal = Cast<APPortal>(HitResult.GetActor()))
+		FHitResult HitResult;
+	
+		FCollisionObjectQueryParams QueryParams;
+		QueryParams.AddObjectTypesToQuery(ECC_Portal);
+	
+		FCollisionQueryParams CollisionQueryParams;
+		CollisionQueryParams.AddIgnoredActor(this);
+		CollisionQueryParams.AddIgnoredActor(PhysicsHandleComp->GetGrabbedComponent()->GetOwner());
+	
+		const bool bHit = GetWorld()->LineTraceSingleByObjectType(HitResult, FirstPersonCameraComp->GetComponentLocation(), NewLocation, QueryParams, CollisionQueryParams);
+		APPortal* HitPortal = Cast<APPortal>(HitResult.GetActor());
+		if (bHit && HitPortal && HitPortal->GetLinkedPortal() != nullptr)
 		{
 			const FVector Location = UPPortalHelper::ConvertLocationToPortalSpace(NewLocation, HitPortal, HitPortal->GetLinkedPortal());
 			PhysicsHandleComp->SetTargetLocation(Location);
 		}
+	
+		bIsGrabbingThroughPortal = bHit;
 	}
 	else
 	{
 		PhysicsHandleComp->SetTargetLocation(NewLocation);
 	}
-	
 }
 
 void APCharacter::OnPortalTeleport()
@@ -228,9 +292,6 @@ void APCharacter::OnPortalTeleport()
 	OrientationReturnTimer = GetWorld()->GetTimeSeconds();
 	OrientationAtStart = GetCapsuleComponent()->GetComponentRotation();
 	bReturnToOrientation = true;
-
-	// TODO Implement a solution where we can keep holding actor through a portal and release it if we can't raycast to the thing we are holding.
-	// Will need to implement ray casting through portals.
 }
 
 void APCharacter::ReturnToOrientation()

@@ -310,6 +310,7 @@ void APPortal::CopyActor(AActor* ActorToCopy)
 	for (UActorComponent* Comp : StaticMeshes)
 	{
 		UStaticMeshComponent* StaticMeshComp = Cast<UStaticMeshComponent>(Comp);
+		StaticMeshComp->SetCollisionObjectType(ECC_WorldDynamic);
 		StaticMeshComp->SetCollisionResponseToChannel(ECC_PortalBox, ECR_Ignore);
 		StaticMeshComp->SetCollisionResponseToChannel(ECC_PortalWall, ECR_Ignore);
 		StaticMeshComp->SetCollisionResponseToChannel(ECC_Portal, ECR_Ignore);
@@ -375,7 +376,7 @@ void APPortal::UpdateTrackedActors()
 {
 	if (TargetPortal == nullptr)
 		return;
-	
+
 	if (ActorsBeingTracked <= 0)
 		return;
 
@@ -394,7 +395,7 @@ void APPortal::UpdateTrackedActors()
 		}
 
 		FTrackedActor TrackedInfo = TrackedPair->Value;
-		
+
 		bool bPassedThroughPortal;
 		FVector CurrPosition;
 		UPrimitiveComponent* Comp = Cast<UPrimitiveComponent>(TrackedActor->GetRootComponent());
@@ -403,7 +404,7 @@ void APPortal::UpdateTrackedActors()
 			// We update the collision profile so we can pass through portals, but we do it only when the target portal is active
 			if (Comp->GetCollisionProfileName() != FName("PortalPawn"))
 				Comp->SetCollisionProfileName(FName("PortalPawn"));
-			
+
 			FVector IntersectionPoint;
 			CurrPosition = PlayerCamera->GetComponentLocation();
 			const bool bIsIntersecting = IsPointCrossingPortal(TrackedInfo.LastTrackedLocation, CurrPosition, IntersectionPoint);
@@ -417,7 +418,7 @@ void APPortal::UpdateTrackedActors()
 			// We update the collision profile so we can pass through portals, but we do it only when the target portal is active
 			if (Comp->GetCollisionProfileName() != FName("PortalCube"))
 				Comp->SetCollisionProfileName(FName("PortalCube"));
-			
+
 			FVector IntersectionPoint;
 			CurrPosition = TrackedInfo.TrackedComp->GetComponentLocation();
 			bPassedThroughPortal = IsPointCrossingPortal(TrackedInfo.LastTrackedLocation, CurrPosition, IntersectionPoint);
@@ -497,32 +498,27 @@ void APPortal::TeleportActor(AActor* ActorToTeleport)
 		const FVector NewVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(SavedVelocity, this, TargetPortal);
 		Character->GetCharacterMovement()->Velocity = NewVelocity;
 
-		//Character->ReleaseActor();
+		Character->ReleaseActor();
 		Character->OnPortalTeleport();
 	}
 	else
 	{
 		UPrimitiveComponent* Comp = Cast<UPrimitiveComponent>(ActorToTeleport->GetRootComponent());
-		bool bIsGrabbed = false;
-		
+
 		Character = Cast<APCharacter>(PlayerController->GetPawn());
 		if (Character != nullptr)
 		{
 			if (const UPrimitiveComponent* GrabbedComp = Character->GetGrabbedComponent())
 			{
 				if (GrabbedComp == Comp)
-					bIsGrabbed = true;
-					//Character->ReleaseActor();
+					Character->ReleaseActor();
 			}
 		}
-
-		if (bIsGrabbed == false)
-		{
-			const FVector NewLinearVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsLinearVelocity(), this, TargetPortal);
-			const FVector NewAngularVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsAngularVelocityInDegrees(), this, TargetPortal);
-			Comp->SetPhysicsLinearVelocity(NewLinearVelocity);
-			Comp->SetPhysicsAngularVelocityInDegrees(NewAngularVelocity);
-		}
+		
+		const FVector NewLinearVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsLinearVelocity(), this, TargetPortal);
+		const FVector NewAngularVelocity = UPPortalHelper::ConvertDirectionToPortalSpace(Comp->GetPhysicsAngularVelocityInDegrees(), this, TargetPortal);
+		Comp->SetPhysicsLinearVelocity(NewLinearVelocity);
+		Comp->SetPhysicsAngularVelocityInDegrees(NewAngularVelocity);
 	}
 
 	// Update the portal view for the target portal
