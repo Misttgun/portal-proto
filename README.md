@@ -1,6 +1,6 @@
 # Portals Proto
-This is a small project where I tried to implement some features from the Portal games in Unreal Engine 5 for educational purposes.  
-The goal was to learn the Unreal Engine and improve my math knoweledge while having some fun.
+This is a small project where I tried to implement some features from the Portal games in Unreal Engine 5.4 for educational purposes.  
+The goal was to learn the Unreal Engine and improve my math knowledge while having some fun.
 
 ## Features
 - Portals visuals
@@ -17,8 +17,8 @@ The goal was to learn the Unreal Engine and improve my math knoweledge while hav
 - Portal teleportation detection fail sometimes when jumping inside a floor portal and vertical portal (very rarely)
 
 ## Inputs
-- **Left Mouse Button** to spawn a blue portal on suported surface
-- **Right Mouse Button** to spawn a red portal on suported surface
+- **Left Mouse Button** to spawn a blue portal on supported surface
+- **Right Mouse Button** to spawn a red portal on supported surface
 - **WASD** to move
 - **F** to pickup orange cubes
 - **ESC** or **P** to pause the game
