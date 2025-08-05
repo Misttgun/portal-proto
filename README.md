@@ -14,6 +14,7 @@ The goal was to learn the Unreal Engine and improve my math knoweledge while hav
 ## Limitations
 - Cannot carry objects through portals
 - Visual glitch when teleporting from one portal to the other due to camera clipping
+- Portal teleportation detection fail sometimes when jumping inside a floor portal and vertical portal (very rarely)
 
 ## Inputs
 - **Left Mouse Button** to spawn a blue portal on suported surface
