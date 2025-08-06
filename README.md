@@ -1,6 +1,7 @@
 # Portals Proto
 This is a small project where I tried to implement some features from the Portal games in Unreal Engine 5.4 for educational purposes.  
-The goal was to learn the Unreal Engine and improve my math knowledge while having some fun.
+The goal was to learn the Unreal Engine and improve my math knowledge while having some fun.  
+You can download the packaged version here: https://misttgun.itch.io/portal-proto
 
 ## Features
 - Portals visuals
