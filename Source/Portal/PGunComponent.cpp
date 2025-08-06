@@ -72,11 +72,10 @@ void UPGunComponent::Fire(const bool bIsLeftPortal)
 	const FVector StartLocation = CameraComp->GetComponentLocation();
 	const FVector EndLocation = StartLocation + CameraComp->GetForwardVector() * MaxPortalDistance;
 
-	const FCollisionObjectQueryParams QueryParams(PortalWallChannel);
 
 	FHitResult HitResult;
 
-	const bool bBlockingHit = GetWorld()->LineTraceSingleByObjectType(HitResult, StartLocation, EndLocation, QueryParams);
+	const bool bBlockingHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility);
 	if (bBlockingHit == false)
 		return;
 

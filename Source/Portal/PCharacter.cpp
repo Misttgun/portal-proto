@@ -240,7 +240,7 @@ bool APCharacter::FindActorToGrabThroughPortal(const bool bDrawDebug, const FVec
 				bIsGrabbingThroughPortal = true;
 
 				const USceneComponent* FocusedComp = NewHitActor->GetRootComponent();
-				const FVector GrabLocation = UPPortalHelper::ConvertLocationToPortalSpace(FocusedComp->GetComponentLocation(), HitPortal, HitPortal->GetLinkedPortal());
+				const FVector GrabLocation = UPPortalHelper::ConvertLocationToPortalSpace(FocusedComp->GetComponentLocation(), HitPortal->GetLinkedPortal(), HitPortal);
 				GrabbedRelativeLocation = FirstPersonCameraComp->GetComponentTransform().InverseTransformPositionNoScale(GrabLocation);
 
 				return true;
@@ -280,6 +280,8 @@ void APCharacter::UpdateGrabbedActorPos()
 		}
 	
 		bIsGrabbingThroughPortal = bHit;
+		if (bHit == false) // We lost track of the object
+			ReleaseActor();
 	}
 	else
 	{

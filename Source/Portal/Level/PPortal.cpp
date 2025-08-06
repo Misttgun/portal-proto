@@ -408,10 +408,7 @@ void APPortal::UpdateTrackedActors()
 			FVector IntersectionPoint;
 			CurrPosition = PlayerCamera->GetComponentLocation();
 			const bool bIsIntersecting = IsPointCrossingPortal(TrackedInfo.LastTrackedLocation, CurrPosition, IntersectionPoint);
-			const FVector RelativeIntersection = PortalMesh->GetComponentTransform().InverseTransformPositionNoScale(IntersectionPoint);
-			const FVector PortalSize = PortalBox->GetScaledBoxExtent();
-			const bool bWithinPortal = FMath::Abs(RelativeIntersection.Z) <= PortalSize.Z && FMath::Abs(RelativeIntersection.Y) <= PortalSize.Y;
-			bPassedThroughPortal = bIsIntersecting && IsPointInFrontOfPortal(TrackedInfo.LastTrackedLocation) && bWithinPortal;
+			bPassedThroughPortal = bIsIntersecting && IsPointInFrontOfPortal(TrackedInfo.LastTrackedLocation);
 		}
 		else
 		{
